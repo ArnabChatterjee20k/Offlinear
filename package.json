@@ -1,0 +1,19 @@
+{
+  "name": "offlinear",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "dev": "pnpm --filter @offlinear/web dev",
+    "build": "pnpm --filter @offlinear/shared build && pnpm --filter @offlinear/web build",
+    "typecheck": "pnpm -r typecheck",
+    "seed": "pnpm --filter @offlinear/scripts seed",
+    "schema:push": "pnpm --filter @offlinear/scripts schema:push",
+    "import": "pnpm --filter @offlinear/scripts import"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
