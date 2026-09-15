@@ -306,7 +306,7 @@ Import is two-pass: pass 1 upserts issues, pass 2 resolves parent/relation refer
 
 - **Appwrite host:** Cloud vs self-hosted — *need endpoint + project id before Phase 3.5.*
 - **GitHub target:** org/repo + Projects v2 board number — *need before Phase 3.5.*
-- **Auth:** Appwrite Auth for app login; **GitHub App** (not PAT) for sync.
+- **Auth:** **GitHub OAuth via Appwrite** for app login (auto-provisions a `members` row); **GitHub App** (not PAT) for sync. Requires the GitHub provider enabled in the Appwrite console.
 - **Relationships:** scalar ids + arrays (not TablesDB deep relations) for offline-mirroring simplicity.
 - **Default autonomy:** agents start in **`approve`** mode, graduate to autopilot per agent.
 - **Agent spawn:** headless `claude -p` / `--resume`; warm-session-on-trigger only if signal traffic is frequent.
