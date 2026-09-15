@@ -22,8 +22,8 @@ module.exports = async ({ req, res, log, error }) => {
 
   const issue = req.bodyJson;
   if (!issue || !issue.$id) return res.json({ skipped: "no row" });
-  if (!GITHUB_TOKEN || !GITHUB_PROJECT_ID) {
-    error("Missing GITHUB_TOKEN / GITHUB_PROJECT_ID");
+  if (!GITHUB_TOKEN) {
+    error("Missing GITHUB_TOKEN");
     return res.json({ error: "not configured" }, 500);
   }
 
@@ -37,6 +37,18 @@ module.exports = async ({ req, res, log, error }) => {
         ...(init.headers || {}),
       },
     });
+
+  // The board chosen in the UI (settings row "app") wins over the env default.
+  let projectId = GITHUB_PROJECT_ID;
+  const settings = await aw(`settings/rows/app`);
+  if (settings.ok) {
+    const s = await settings.json();
+    if (s.githubProjectId) projectId = s.githubProjectId;
+  }
+  if (!projectId) {
+    error("No GitHub project selected (settings.app or GITHUB_PROJECT_ID)");
+    return res.json({ error: "no project" }, 500);
+  }
 
   const gql = async (query, variables) => {
     const r = await fetch("https://api.github.com/graphql", {
@@ -62,7 +74,7 @@ module.exports = async ({ req, res, log, error }) => {
         projectItem { id }
       }
     }`,
-    { p: GITHUB_PROJECT_ID, t: issue.title, b: issue.description || "" }
+    { p: projectId, t: issue.title, b: issue.description || "" }
   );
   const itemId = data.addProjectV2DraftIssue.projectItem.id;
 
@@ -70,7 +82,7 @@ module.exports = async ({ req, res, log, error }) => {
   const put = await aw(`sync_map/rows/${issue.$id}`, {
     method: "PUT",
     body: JSON.stringify({
-      data: { itemId, projectId: GITHUB_PROJECT_ID, rev: 1, createdAt: now, updatedAt: now },
+      data: { itemId, projectId, rev: 1, createdAt: now, updatedAt: now },
     }),
   });
   if (!put.ok) {

@@ -121,6 +121,16 @@ const TABLES: Table[] = [
       { name: "projectId", kind: "string", size: 64 },
     ],
   },
+  {
+    // App settings (single row id "app"). The chosen GitHub board lives here so
+    // the auto-syncer function honours what the user picks in the UI.
+    id: "settings",
+    attrs: [
+      { name: "githubProjectId", kind: "string", size: 64 },
+      { name: "githubOwner", kind: "string", size: 100 },
+      { name: "githubTitle", kind: "string", size: 256 },
+    ],
+  },
 ];
 
 const ignore409 = async (p: Promise<unknown>, label: string) => {

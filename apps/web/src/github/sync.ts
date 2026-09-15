@@ -1,6 +1,7 @@
 import type { Issue } from "@offlinear/shared";
 import { db } from "@/db/db";
 import { createIssue } from "@/store/mutations";
+import { DATABASE_ID, appwriteConfigured, tablesDB } from "@/sync/appwrite-config";
 import { addDraftIssue, getProjectItems, type GhItem, type GhProject } from "./client";
 
 const PROJECT_KEY = "github.project";
@@ -8,8 +9,25 @@ const PROJECT_KEY = "github.project";
 export async function getSelectedProject(): Promise<GhProject | null> {
   return ((await db.meta.get(PROJECT_KEY))?.value as GhProject | undefined) ?? null;
 }
+
 export async function setSelectedProject(p: GhProject | null): Promise<void> {
   await db.meta.put({ key: PROJECT_KEY, value: p });
+  // Persist to Appwrite too so the cloud auto-syncer targets the chosen board.
+  if (appwriteConfigured && tablesDB) {
+    const now = new Date().toISOString();
+    try {
+      await tablesDB.upsertRow(DATABASE_ID, "settings", "app", {
+        githubProjectId: p?.id ?? null,
+        githubOwner: p?.owner ?? null,
+        githubTitle: p?.title ?? null,
+        rev: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch {
+      /* settings table may not exist yet; local choice still applies */
+    }
+  }
 }
 
 export interface Diff {
