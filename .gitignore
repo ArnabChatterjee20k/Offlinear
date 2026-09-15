@@ -5,3 +5,6 @@ dist/
 *.tsbuildinfo
 .DS_Store
 apps/web/public/seed.json
+
+# source data (personal)
+arnab@appwrite.io*.csv
