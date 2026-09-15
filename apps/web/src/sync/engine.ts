@@ -106,27 +106,26 @@ export async function drain(): Promise<void> {
   }
 }
 
+const MAX_ATTEMPTS = 5;
+
 async function processEntry(entry: OutboxEntry): Promise<void> {
   await db.outbox.update(entry.opId, { status: "syncing" });
-  try {
-    const res = await adapter.push(entry.op);
-    if (res.ok) {
-      // Ack: the outbox entry is done. (Rev reconciliation with a real server
-      // happens in the AppwriteAdapter path.)
+  const fail = async (error: string) => {
+    const attempts = entry.attempts + 1;
+    if (attempts >= MAX_ATTEMPTS) {
+      // Dead-letter: give up so one bad op can't spin the drain loop forever.
+      console.warn(`[sync] dropping op after ${attempts} attempts:`, entry.op.entity, error);
       await db.outbox.delete(entry.opId);
     } else {
-      await db.outbox.update(entry.opId, {
-        status: "failed",
-        attempts: entry.attempts + 1,
-        error: res.conflict,
-      });
+      await db.outbox.update(entry.opId, { status: "failed", attempts, error });
     }
+  };
+  try {
+    const res = await adapter.push(entry.op);
+    if (res.ok) await db.outbox.delete(entry.opId);
+    else await fail(res.conflict);
   } catch (e) {
-    await db.outbox.update(entry.opId, {
-      status: "failed",
-      attempts: entry.attempts + 1,
-      error: String(e),
-    });
+    await fail(String(e));
   }
 }
 
