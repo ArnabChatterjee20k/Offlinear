@@ -3,6 +3,7 @@ import { db } from "@/db/db";
 import { useUI } from "@/store/ui";
 import { deleteIssues } from "@/store/mutations";
 import { redo, undo } from "@/store/history";
+import { boardCardIds } from "@/lib/board-order";
 
 const isTyping = (el: EventTarget | null) => {
   const n = el as HTMLElement | null;
@@ -10,12 +11,6 @@ const isTyping = (el: EventTarget | null) => {
   const tag = n.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || n.isContentEditable;
 };
-
-/** Ordered list of visible board card ids, left-to-right, top-to-bottom. */
-function boardCardIds(): string[] {
-  const nodes = document.querySelectorAll<HTMLElement>("#board [data-issue-id]");
-  return [...nodes].map((n) => n.dataset.issueId!).filter(Boolean);
-}
 
 /**
  * Global keyboard-first controls. Single-key actions operate on the current

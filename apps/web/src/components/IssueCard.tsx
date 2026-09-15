@@ -12,7 +12,7 @@ interface Props {
   focused?: boolean;
   selected?: boolean;
   showState?: boolean;
-  onOpen?: (id: string) => void;
+  onClick?: (e: React.MouseEvent) => void;
   dragHandleProps?: Record<string, unknown>;
 }
 
@@ -24,7 +24,7 @@ const Stop = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueCard(
-  { issue, focused, selected, showState, onOpen, dragHandleProps },
+  { issue, focused, selected, showState, onClick, dragHandleProps },
   ref
 ) {
   const { stateById, memberById, labelById, subCountByParent } = useLookupCtx();
@@ -36,12 +36,12 @@ export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueC
     <div
       ref={ref}
       data-issue-id={issue.id}
-      onClick={() => onOpen?.(issue.id)}
+      onClick={onClick}
       className={cn(
-        "group cursor-pointer rounded-lg border bg-surface-1 p-2.5 hairline-t transition-colors",
+        "group cursor-pointer select-none rounded-lg border bg-surface-1 p-2.5 hairline-t transition-colors",
         "hover:border-hairline-strong",
         focused ? "border-brand/70 ring-1 ring-brand/40" : "border-hairline",
-        selected && "ring-1 ring-brand"
+        selected && "border-brand !bg-brand/10 ring-1 ring-brand"
       )}
       {...dragHandleProps}
     >

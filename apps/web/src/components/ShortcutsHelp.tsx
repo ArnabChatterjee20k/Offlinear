@@ -34,6 +34,8 @@ const GROUPS: Group[] = [
     title: "Selection & edits",
     items: [
       { keys: ["X"], label: "Select / deselect issue" },
+      { keys: ["⇧ Click"], label: "Select a range" },
+      { keys: [`${MOD} Click`], label: "Toggle one" },
       { keys: [MOD, "A"], label: "Select all" },
       { keys: [BACKSPACE], label: "Delete selected" },
       { keys: [MOD, "Z"], label: "Undo" },

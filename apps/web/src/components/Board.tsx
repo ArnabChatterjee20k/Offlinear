@@ -19,11 +19,40 @@ import { useBoardIssues, useStates } from "@/hooks/useData";
 import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
 import { moveIssue } from "@/store/mutations";
+import { boardCardIds } from "@/lib/board-order";
 
 const PAGE = 25; // cards rendered per column before lazy-loading more
 
+/** Click behaviour: plain = open (clears selection); ⌘/Ctrl = toggle one;
+ *  Shift = select the range from the anchor to this card. */
+function handleCardClick(e: React.MouseEvent, id: string) {
+  const ui = useUI.getState();
+  if (e.shiftKey) {
+    e.preventDefault();
+    const ids = boardCardIds();
+    const anchor = ui.anchorId ?? ui.focusedIssueId ?? id;
+    const a = ids.indexOf(anchor);
+    const b = ids.indexOf(id);
+    if (a >= 0 && b >= 0) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      ui.addSelection(ids.slice(lo, hi + 1));
+    } else {
+      ui.toggleSelect(id);
+    }
+    ui.setFocus(id);
+  } else if (e.metaKey || e.ctrlKey) {
+    e.preventDefault();
+    ui.toggleSelect(id);
+    ui.setFocus(id);
+  } else {
+    ui.clearSelection();
+    ui.setAnchor(id);
+    ui.setFocus(id);
+    ui.openIssue(id);
+  }
+}
+
 function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
-  const openIssue = useUI((s) => s.openIssue);
   const selected = useUI((s) => s.selection.has(issue.id));
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: issue.id });
   return (
@@ -32,7 +61,7 @@ function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
         issue={issue}
         focused={focused}
         selected={selected}
-        onOpen={openIssue}
+        onClick={(e) => handleCardClick(e, issue.id)}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>

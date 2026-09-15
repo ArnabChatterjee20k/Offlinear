@@ -16,6 +16,8 @@ interface UIState {
   focusedIssueId: string | null;
   /** Multi-select set for bulk keyboard actions. */
   selection: Set<string>;
+  /** Range-select anchor (last card clicked without shift). */
+  anchorId: string | null;
   palette: Palette;
   helpOpen: boolean;
   /** Create-issue modal: closed (null) or open, optionally editing a draft /
@@ -26,6 +28,8 @@ interface UIState {
   setFocus: (id: string | null) => void;
   toggleSelect: (id: string) => void;
   select: (ids: string[]) => void;
+  addSelection: (ids: string[]) => void;
+  setAnchor: (id: string | null) => void;
   clearSelection: () => void;
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
@@ -38,6 +42,7 @@ export const useUI = create<UIState>((set) => ({
   openIssueId: null,
   focusedIssueId: null,
   selection: new Set(),
+  anchorId: null,
   palette: { open: false, mode: "root", targets: [] },
   helpOpen: false,
   create: null,
@@ -48,10 +53,17 @@ export const useUI = create<UIState>((set) => ({
     set((s) => {
       const next = new Set(s.selection);
       next.has(id) ? next.delete(id) : next.add(id);
-      return { selection: next };
+      return { selection: next, anchorId: id };
     }),
   select: (ids) => set({ selection: new Set(ids) }),
-  clearSelection: () => set({ selection: new Set() }),
+  addSelection: (ids) =>
+    set((s) => {
+      const next = new Set(s.selection);
+      ids.forEach((id) => next.add(id));
+      return { selection: next };
+    }),
+  setAnchor: (id) => set({ anchorId: id }),
+  clearSelection: () => set({ selection: new Set(), anchorId: null }),
   openPalette: (mode = "root", targets = []) =>
     set({ palette: { open: true, mode, targets } }),
   closePalette: () => set((s) => ({ palette: { ...s.palette, open: false } })),
