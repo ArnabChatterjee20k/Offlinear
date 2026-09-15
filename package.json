@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r typecheck",
     "seed": "pnpm --filter @offlinear/scripts seed",
     "schema:push": "pnpm --filter @offlinear/scripts schema:push",
-    "import": "pnpm --filter @offlinear/scripts run import"
+    "import": "pnpm --filter @offlinear/scripts run import",
+    "serve": "bun run apps/server/server.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

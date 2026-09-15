@@ -2,15 +2,30 @@
 // with the OAuth provider token (GitHub API allows CORS). This is the
 // client-side sync path; a server-side GitHub App can replace it later.
 import { githubToken } from "@/auth";
+import { BRIDGE_URL, getMode } from "./config";
 
 async function gql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
-  const token = await githubToken();
-  if (!token) throw new Error("Not connected to GitHub");
-  const res = await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: { Authorization: `bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
+  const body = JSON.stringify({ query, variables });
+  const mode = await getMode();
+
+  let res: Response;
+  if (mode === "cli") {
+    // The bridge adds the gh-CLI token server-side; the browser sends no token.
+    res = await fetch(`${BRIDGE_URL}/graphql`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } else {
+    const token = await githubToken();
+    if (!token) throw new Error("Not connected to GitHub");
+    res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: { Authorization: `bearer ${token}`, "Content-Type": "application/json" },
+      body,
+    });
+  }
+
   const json = await res.json();
   if (json.errors) throw new Error(json.errors.map((e: { message: string }) => e.message).join("; "));
   return json.data as T;

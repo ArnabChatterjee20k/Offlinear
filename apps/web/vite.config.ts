@@ -4,6 +4,15 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
+  // Proxy the gh-bridge API to the Bun server during dev.
+  server: {
+    proxy: {
+      "/api": {
+        target: process.env.VITE_SERVER_ORIGIN ?? "http://localhost:8788",
+        changeOrigin: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

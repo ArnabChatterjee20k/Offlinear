@@ -1,0 +1,21 @@
+# One service: the Bun server serving the web UI + gh API.
+#   docker compose --env-file apps/web/.env up --build
+# GitHub auth: set GH_TOKEN, or mount a signed-in gh config (uncomment below).
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_APPWRITE_ENDPOINT: ${VITE_APPWRITE_ENDPOINT:-}
+        VITE_APPWRITE_PROJECT_ID: ${VITE_APPWRITE_PROJECT_ID:-}
+        VITE_APPWRITE_DATABASE_ID: ${VITE_APPWRITE_DATABASE_ID:-offlinear}
+        VITE_GH_BRIDGE_URL: /api/gh
+    ports:
+      - "8788:8788"
+    environment:
+      # Prefer a token for deploys; or mount gh config instead (below).
+      GH_TOKEN: ${GH_TOKEN:-}
+    # volumes:
+    #   - ${HOME}/.config/gh:/root/.config/gh:ro
+    restart: unless-stopped
