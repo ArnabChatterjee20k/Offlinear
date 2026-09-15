@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { db } from "@/db/db";
 import { useUI } from "@/store/ui";
-import { createIssue, deleteIssues } from "@/store/mutations";
+import { deleteIssues } from "@/store/mutations";
 import { redo, undo } from "@/store/history";
 
 const isTyping = (el: EventTarget | null) => {
@@ -110,7 +110,7 @@ export function useKeyboard() {
           break;
         case "c":
           e.preventDefault();
-          void createIssue({ title: "New issue" }).then((id) => s.openIssue(id));
+          s.openCreate();
           break;
         case "s":
           if (targets.length) s.openPalette("status", targets);

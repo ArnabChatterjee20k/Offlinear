@@ -18,7 +18,7 @@ import { IssueCard } from "./IssueCard";
 import { useBoardIssues, useStates } from "@/hooks/useData";
 import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
-import { createIssue, moveIssue } from "@/store/mutations";
+import { moveIssue } from "@/store/mutations";
 
 const PAGE = 25; // cards rendered per column before lazy-loading more
 
@@ -42,6 +42,7 @@ function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
 function Column({ state, issues }: { state: State; issues: Issue[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: state.id });
   const focusedId = useUI((s) => s.focusedIssueId);
+  const openCreate = useUI((s) => s.openCreate);
   const [visible, setVisible] = React.useState(PAGE);
 
   // Grow the window as the user nears the bottom (lazy render).
@@ -66,7 +67,7 @@ function Column({ state, issues }: { state: State; issues: Issue[] }) {
         <button
           className="ml-auto rounded p-1 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
           title="New issue in this state"
-          onClick={() => createIssue({ title: "New issue", stateId: state.id }).then()}
+          onClick={() => openCreate({ stateId: state.id })}
         >
           <Plus className="h-3.5 w-3.5" />
         </button>

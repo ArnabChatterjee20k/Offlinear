@@ -5,9 +5,22 @@ import type {
   Label,
   Member,
   Op,
+  Priority,
   State,
   Team,
 } from "@offlinear/shared";
+
+/** An unsent issue being composed. Local-only; never synced. */
+export interface Draft {
+  id: string;
+  title: string;
+  description: string;
+  stateId: string | null;
+  priority: Priority;
+  assigneeId: string | null;
+  labelIds: string[];
+  updatedAt: string;
+}
 
 // Outbox entry: a pending op plus its local sync bookkeeping.
 export interface OutboxEntry {
@@ -34,6 +47,7 @@ export class OfflinearDB extends Dexie {
   comments!: EntityTable<Comment, "id">;
   outbox!: EntityTable<OutboxEntry, "opId">;
   meta!: EntityTable<Meta, "key">;
+  drafts!: EntityTable<Draft, "id">;
 
   constructor() {
     super("offlinear");
@@ -47,6 +61,7 @@ export class OfflinearDB extends Dexie {
       outbox: "opId, status",
       meta: "key",
     });
+    this.version(2).stores({ drafts: "id, updatedAt" });
   }
 }
 

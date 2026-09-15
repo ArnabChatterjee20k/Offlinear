@@ -27,6 +27,9 @@ export const useSubIssues = (parentId: string | null) =>
     [] as Issue[]
   );
 
+export const useDrafts = () =>
+  useLiveQuery(() => db.drafts.orderBy("updatedAt").reverse().toArray(), [], []);
+
 export const useComments = (issueId: string | null) =>
   useLiveQuery(
     () =>

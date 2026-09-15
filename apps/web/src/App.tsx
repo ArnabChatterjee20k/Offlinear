@@ -4,6 +4,7 @@ import { Board } from "./components/Board";
 import { IssuePanel } from "./components/IssuePanel";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
+import { CreateIssueModal } from "./components/CreateIssueModal";
 import { useKeyboard } from "./hooks/useKeyboard";
 
 export function App() {
@@ -20,6 +21,7 @@ export function App() {
       <IssuePanel />
       <CommandPalette />
       <ShortcutsHelp />
+      <CreateIssueModal />
     </div>
   );
 }

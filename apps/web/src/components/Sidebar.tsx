@@ -1,9 +1,10 @@
-import { LayoutGrid, Inbox, Bot, LogOut, Keyboard } from "lucide-react";
+import { LayoutGrid, Inbox, Bot, LogOut, Keyboard, FileText, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTeams } from "@/hooks/useData";
+import { useTeams, useDrafts } from "@/hooks/useData";
 import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
 import { useUI } from "@/store/ui";
+import { deleteDraft } from "@/store/drafts";
 import { logout } from "@/auth";
 import { appwriteConfigured } from "@/sync/appwrite-config";
 
@@ -46,6 +47,9 @@ export function Sidebar() {
         <NavItem icon={Bot} label="Agents" />
       </nav>
 
+      <Drafts />
+
+
       <div className="mt-2 px-3 py-1 text-[11px] uppercase tracking-wider text-ink-tertiary">
         Teams
       </div>
@@ -68,6 +72,43 @@ export function Sidebar() {
         <UserChip />
       </div>
     </aside>
+  );
+}
+
+function Drafts() {
+  const drafts = useDrafts();
+  const openCreate = useUI((s) => s.openCreate);
+  if (drafts.length === 0) return null;
+  return (
+    <div className="px-2 pt-2">
+      <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] uppercase tracking-wider text-ink-tertiary">
+        <FileText className="h-3 w-3" />
+        Drafts
+        <span className="text-ink-tertiary">{drafts.length}</span>
+      </div>
+      <div className="space-y-0.5">
+        {drafts.map((d) => (
+          <div
+            key={d.id}
+            className="group flex items-center gap-1 rounded-md px-2 py-1 hover:bg-surface-1"
+          >
+            <button
+              onClick={() => openCreate({ draftId: d.id })}
+              className="min-w-0 flex-1 truncate text-left text-[13px] text-ink-muted hover:text-ink"
+            >
+              {d.title || "Untitled"}
+            </button>
+            <button
+              onClick={() => deleteDraft(d.id)}
+              className="rounded p-0.5 text-ink-tertiary opacity-0 hover:text-danger group-hover:opacity-100"
+              title="Discard draft"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

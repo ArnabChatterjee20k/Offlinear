@@ -4,7 +4,6 @@ import { Button } from "./ui/button";
 import { Kbd } from "./ui/primitives";
 import { useSync } from "@/sync/engine";
 import { useUI } from "@/store/ui";
-import { createIssue } from "@/store/mutations";
 import { MOD } from "@/lib/platform";
 
 function SyncDot() {
@@ -28,6 +27,7 @@ function SyncDot() {
 
 export function TopBar() {
   const openPalette = useUI((s) => s.openPalette);
+  const openCreate = useUI((s) => s.openCreate);
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline px-5">
       <h2 className="text-[14px] font-medium text-ink">Board</h2>
@@ -41,7 +41,7 @@ export function TopBar() {
           Search…
           <Kbd>{MOD}K</Kbd>
         </button>
-        <Button variant="primary" size="sm" onClick={() => createIssue({ title: "New issue" })}>
+        <Button variant="primary" size="sm" onClick={() => openCreate()}>
           <Plus className="h-3.5 w-3.5" />
           New
         </Button>

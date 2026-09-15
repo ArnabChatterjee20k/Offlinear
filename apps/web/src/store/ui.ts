@@ -18,6 +18,9 @@ interface UIState {
   selection: Set<string>;
   palette: Palette;
   helpOpen: boolean;
+  /** Create-issue modal: closed (null) or open, optionally editing a draft /
+   *  pre-filling a state. */
+  create: { open: boolean; draftId?: string; stateId?: string } | null;
 
   openIssue: (id: string | null) => void;
   setFocus: (id: string | null) => void;
@@ -27,6 +30,8 @@ interface UIState {
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
   setHelp: (open: boolean) => void;
+  openCreate: (opts?: { draftId?: string; stateId?: string }) => void;
+  closeCreate: () => void;
 }
 
 export const useUI = create<UIState>((set) => ({
@@ -35,6 +40,7 @@ export const useUI = create<UIState>((set) => ({
   selection: new Set(),
   palette: { open: false, mode: "root", targets: [] },
   helpOpen: false,
+  create: null,
 
   openIssue: (id) => set({ openIssueId: id }),
   setFocus: (id) => set({ focusedIssueId: id }),
@@ -50,4 +56,6 @@ export const useUI = create<UIState>((set) => ({
     set({ palette: { open: true, mode, targets } }),
   closePalette: () => set((s) => ({ palette: { ...s.palette, open: false } })),
   setHelp: (open) => set({ helpOpen: open }),
+  openCreate: (opts) => set({ create: { open: true, ...opts } }),
+  closeCreate: () => set({ create: null }),
 }));
