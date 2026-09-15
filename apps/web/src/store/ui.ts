@@ -22,6 +22,7 @@ interface UIState {
   openIssue: (id: string | null) => void;
   setFocus: (id: string | null) => void;
   toggleSelect: (id: string) => void;
+  select: (ids: string[]) => void;
   clearSelection: () => void;
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
@@ -43,6 +44,7 @@ export const useUI = create<UIState>((set) => ({
       next.has(id) ? next.delete(id) : next.add(id);
       return { selection: next };
     }),
+  select: (ids) => set({ selection: new Set(ids) }),
   clearSelection: () => set({ selection: new Set() }),
   openPalette: (mode = "root", targets = []) =>
     set({ palette: { open: true, mode, targets } }),

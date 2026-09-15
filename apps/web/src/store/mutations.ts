@@ -8,6 +8,7 @@ import {
 } from "@offlinear/shared";
 import { db } from "@/db/db";
 import { commit } from "@/sync/engine";
+import { batch } from "./history";
 import { getActorId, getTeamId } from "./session";
 
 const nowIso = () => new Date().toISOString();
@@ -167,6 +168,29 @@ export const addSubIssue = (parentId: string, title: string) =>
 
 export const setParent = (id: string, parentId: string | null) =>
   updateIssue(id, { parentId });
+
+// --- Delete ----------------------------------------------------------------
+
+export async function deleteIssue(id: string): Promise<void> {
+  const issue = await db.issues.get(id);
+  if (!issue) return;
+  await commit(
+    makeOp<Issue>({
+      entity: "issues",
+      entityId: id,
+      type: "delete",
+      patch: {},
+      baseRev: issue.rev,
+      actorId: getActorId(),
+    })
+  );
+}
+
+/** Delete several issues as one undoable action. */
+export const deleteIssues = (ids: string[]) =>
+  batch(async () => {
+    for (const id of ids) await deleteIssue(id);
+  });
 
 // --- Comments --------------------------------------------------------------
 

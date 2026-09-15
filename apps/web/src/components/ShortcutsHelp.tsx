@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Kbd } from "./ui/primitives";
 import { useUI } from "@/store/ui";
+import { BACKSPACE, ENTER, MOD, SHIFT } from "@/lib/platform";
 
 interface Shortcut {
   keys: string[];
@@ -17,21 +18,27 @@ const GROUPS: Group[] = [
     items: [
       { keys: ["↑", "↓"], label: "Move focus between issues" },
       { keys: ["J", "K"], label: "Move focus (vim keys)" },
-      { keys: ["↵"], label: "Open focused issue" },
+      { keys: [ENTER], label: "Open focused issue" },
       { keys: ["Esc"], label: "Close panel / clear selection" },
     ],
   },
   {
     title: "General",
     items: [
-      { keys: ["⌘", "K"], label: "Command palette" },
+      { keys: [MOD, "K"], label: "Command palette" },
       { keys: ["C"], label: "Create issue" },
       { keys: ["?"], label: "This shortcut sheet" },
     ],
   },
   {
-    title: "Selection",
-    items: [{ keys: ["X"], label: "Select / deselect issue" }],
+    title: "Selection & edits",
+    items: [
+      { keys: ["X"], label: "Select / deselect issue" },
+      { keys: [MOD, "A"], label: "Select all" },
+      { keys: [BACKSPACE], label: "Delete selected" },
+      { keys: [MOD, "Z"], label: "Undo" },
+      { keys: [MOD, SHIFT, "Z"], label: "Redo" },
+    ],
   },
   {
     title: "Issue actions",
@@ -44,7 +51,7 @@ const GROUPS: Group[] = [
   },
   {
     title: "Comments",
-    items: [{ keys: ["⌘", "↵"], label: "Submit comment" }],
+    items: [{ keys: [MOD, ENTER], label: "Submit comment" }],
   },
 ];
 

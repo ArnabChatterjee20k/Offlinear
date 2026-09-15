@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { db } from "@/db/db";
 import { useUI } from "@/store/ui";
-import { createIssue } from "@/store/mutations";
+import { createIssue, deleteIssues } from "@/store/mutations";
+import { redo, undo } from "@/store/history";
 
 const isTyping = (el: EventTarget | null) => {
   const n = el as HTMLElement | null;
@@ -27,10 +29,28 @@ export function useKeyboard() {
     function onKey(e: KeyboardEvent) {
       const s = ui.getState();
 
-      // Command palette — always available.
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        s.palette.open ? s.closePalette() : s.openPalette();
+      // Meta/Ctrl combos.
+      if (e.metaKey || e.ctrlKey) {
+        const k = e.key.toLowerCase();
+        if (k === "k") {
+          e.preventDefault();
+          s.palette.open ? s.closePalette() : s.openPalette();
+          return;
+        }
+        if (isTyping(e.target)) return; // leave native undo/select in inputs
+        if (k === "z") {
+          e.preventDefault();
+          void (e.shiftKey ? redo() : undo());
+        } else if (k === "y") {
+          e.preventDefault();
+          void redo();
+        } else if (k === "a") {
+          e.preventDefault();
+          void db.issues
+            .filter((i) => !i.parentId && !i.archivedAt)
+            .toArray()
+            .then((rows) => s.select(rows.map((r) => r.id)));
+        }
         return;
       }
 
@@ -77,6 +97,15 @@ export function useKeyboard() {
           if (focused) {
             e.preventDefault();
             s.toggleSelect(focused);
+          }
+          break;
+        case "Backspace":
+        case "Delete":
+          if (targets.length) {
+            e.preventDefault();
+            void deleteIssues(targets);
+            s.clearSelection();
+            s.setFocus(null);
           }
           break;
         case "c":
