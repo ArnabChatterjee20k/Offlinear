@@ -1,8 +1,9 @@
-import { LayoutGrid, Inbox, Bot, LogOut } from "lucide-react";
+import { LayoutGrid, Inbox, Bot, LogOut, Keyboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTeams } from "@/hooks/useData";
-import { Avatar } from "./ui/primitives";
+import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
+import { useUI } from "@/store/ui";
 import { logout } from "@/auth";
 import { appwriteConfigured } from "@/sync/appwrite-config";
 
@@ -63,9 +64,24 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto p-2">
+        <ShortcutsButton />
         <UserChip />
       </div>
     </aside>
+  );
+}
+
+function ShortcutsButton() {
+  const setHelp = useUI((s) => s.setHelp);
+  return (
+    <button
+      onClick={() => setHelp(true)}
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-ink-subtle hover:bg-surface-1 hover:text-ink"
+    >
+      <Keyboard className="h-4 w-4" />
+      Shortcuts
+      <Kbd>?</Kbd>
+    </button>
   );
 }
 

@@ -17,6 +17,7 @@ interface UIState {
   /** Multi-select set for bulk keyboard actions. */
   selection: Set<string>;
   palette: Palette;
+  helpOpen: boolean;
 
   openIssue: (id: string | null) => void;
   setFocus: (id: string | null) => void;
@@ -24,6 +25,7 @@ interface UIState {
   clearSelection: () => void;
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
+  setHelp: (open: boolean) => void;
 }
 
 export const useUI = create<UIState>((set) => ({
@@ -31,6 +33,7 @@ export const useUI = create<UIState>((set) => ({
   focusedIssueId: null,
   selection: new Set(),
   palette: { open: false, mode: "root", targets: [] },
+  helpOpen: false,
 
   openIssue: (id) => set({ openIssueId: id }),
   setFocus: (id) => set({ focusedIssueId: id }),
@@ -44,4 +47,5 @@ export const useUI = create<UIState>((set) => ({
   openPalette: (mode = "root", targets = []) =>
     set({ palette: { open: true, mode, targets } }),
   closePalette: () => set((s) => ({ palette: { ...s.palette, open: false } })),
+  setHelp: (open) => set({ helpOpen: open }),
 }));

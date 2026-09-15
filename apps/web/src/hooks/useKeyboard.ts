@@ -35,13 +35,21 @@ export function useKeyboard() {
       }
 
       if (e.key === "Escape") {
-        if (s.palette.open) return; // Dialog handles it
+        if (s.palette.open || s.helpOpen) return; // Dialog handles it
         if (s.openIssueId) return; // Sheet handles it
         if (s.selection.size) s.clearSelection();
         return;
       }
 
-      if (s.palette.open || isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (s.palette.open || s.helpOpen || isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey)
+        return;
+
+      // "?" (Shift+/) toggles the shortcut sheet.
+      if (e.key === "?") {
+        e.preventDefault();
+        s.setHelp(!s.helpOpen);
+        return;
+      }
 
       const ids = boardCardIds();
       const idx = s.focusedIssueId ? ids.indexOf(s.focusedIssueId) : -1;

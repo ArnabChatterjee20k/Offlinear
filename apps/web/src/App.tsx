@@ -3,6 +3,7 @@ import { TopBar } from "./components/TopBar";
 import { Board } from "./components/Board";
 import { IssuePanel } from "./components/IssuePanel";
 import { CommandPalette } from "./components/CommandPalette";
+import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { useKeyboard } from "./hooks/useKeyboard";
 
 export function App() {
@@ -18,6 +19,7 @@ export function App() {
       </main>
       <IssuePanel />
       <CommandPalette />
+      <ShortcutsHelp />
     </div>
   );
 }
