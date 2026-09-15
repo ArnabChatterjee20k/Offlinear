@@ -129,6 +129,7 @@ const TABLES: Table[] = [
       { name: "githubProjectId", kind: "string", size: 64 },
       { name: "githubOwner", kind: "string", size: 100 },
       { name: "githubTitle", kind: "string", size: 256 },
+      { name: "githubToken", kind: "string", size: 512 },
     ],
   },
 ];

@@ -23,15 +23,18 @@ if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !APPWRITE_API_KEY) {
   console.error("Missing Appwrite env vars. See .env.example.");
   process.exit(1);
 }
-if (!GITHUB_PROJECT_ID) {
-  console.error("Set GITHUB_PROJECT_ID (the Projects v2 node id, e.g. PVT_...).");
-  process.exit(1);
-}
+// GITHUB_PROJECT_ID is optional — the app writes the chosen board to the
+// settings row, which the function prefers.
 
-const githubToken = (process.env.GITHUB_TOKEN || execSync("gh auth token").toString()).trim();
+// Optional: the token can instead be entered in the app UI (stored in the
+// settings row, which the function prefers). Seed the env var if we have one.
+let githubToken = process.env.GITHUB_TOKEN ?? "";
 if (!githubToken) {
-  console.error("No GitHub token (set GITHUB_TOKEN or run `gh auth login`).");
-  process.exit(1);
+  try {
+    githubToken = execSync("gh auth token").toString().trim();
+  } catch {
+    /* none — the function will use settings.githubToken instead */
+  }
 }
 
 const client = new Client()
@@ -49,8 +52,8 @@ const events = [
 const variables: Record<string, string> = {
   APPWRITE_API_KEY: APPWRITE_API_KEY!,
   APPWRITE_DATABASE_ID: APPWRITE_DATABASE_ID!,
-  GITHUB_TOKEN: githubToken,
-  GITHUB_PROJECT_ID: GITHUB_PROJECT_ID!,
+  ...(GITHUB_PROJECT_ID ? { GITHUB_PROJECT_ID } : {}),
+  ...(githubToken ? { GITHUB_TOKEN: githubToken } : {}),
 };
 
 async function main() {

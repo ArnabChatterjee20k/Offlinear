@@ -13,9 +13,11 @@ import {
   getSelectedProject,
   importItems,
   pushIssues,
+  saveGithubToken,
   setSelectedProject,
   type Diff,
 } from "@/github/sync";
+import { Input } from "./ui/input";
 import type { Issue } from "@offlinear/shared";
 
 type Phase = "loading" | "connect" | "pick" | "sync";
@@ -236,7 +238,9 @@ export function GitHubDialog() {
           )}
 
           {phase === "sync" && (
-            <SyncView
+            <>
+              <TokenField />
+              <SyncView
               diff={diff}
               busy={busy}
               progress={progress}
@@ -246,11 +250,55 @@ export function GitHubDialog() {
               onTogglePush={(id) => setPushSel((s) => toggle(s, id))}
               onToggleImport={(id) => setImportSel((s) => toggle(s, id))}
               onApply={apply}
-            />
+              />
+            </>
           )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Optional GitHub token for the cloud auto-syncer (stored in Appwrite
+ *  settings — the function uses it instead of the deploy-time env var). */
+function TokenField() {
+  const [token, setToken] = React.useState("");
+  const [saved, setSaved] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await saveGithubToken(token);
+      setSaved(true);
+      setToken("");
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <details className="mb-4 rounded-md border border-hairline">
+      <summary className="cursor-pointer px-3 py-2 text-[12px] text-ink-subtle">
+        Auto-sync token (server)
+      </summary>
+      <div className="space-y-1.5 px-3 pb-3">
+        <p className="text-[11px] text-ink-tertiary">
+          Paste a GitHub token (fine-grained PAT with Projects read/write). The cloud
+          auto-syncer uses this instead of the env token. Stored in your project DB.
+        </p>
+        <div className="flex gap-1.5">
+          <Input
+            type="password"
+            placeholder="ghp_… or github_pat_…"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+          />
+          <Button variant="primary" size="sm" disabled={busy || !token.trim()} onClick={save}>
+            {saved ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </details>
   );
 }
 

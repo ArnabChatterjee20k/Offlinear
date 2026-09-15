@@ -22,10 +22,6 @@ module.exports = async ({ req, res, log, error }) => {
 
   const issue = req.bodyJson;
   if (!issue || !issue.$id) return res.json({ skipped: "no row" });
-  if (!GITHUB_TOKEN) {
-    error("Missing GITHUB_TOKEN");
-    return res.json({ error: "not configured" }, 500);
-  }
 
   const aw = (path, init = {}) =>
     fetch(`${ENDPOINT}/tablesdb/${DB}/tables/${path}`, {
@@ -38,12 +34,18 @@ module.exports = async ({ req, res, log, error }) => {
       },
     });
 
-  // The board chosen in the UI (settings row "app") wins over the env default.
+  // Board + token chosen in the UI (settings row "app") win over the env vars.
   let projectId = GITHUB_PROJECT_ID;
+  let token = GITHUB_TOKEN;
   const settings = await aw(`settings/rows/app`);
   if (settings.ok) {
     const s = await settings.json();
     if (s.githubProjectId) projectId = s.githubProjectId;
+    if (s.githubToken) token = s.githubToken;
+  }
+  if (!token) {
+    error("No GitHub token (settings.app.githubToken or GITHUB_TOKEN)");
+    return res.json({ error: "no token" }, 500);
   }
   if (!projectId) {
     error("No GitHub project selected (settings.app or GITHUB_PROJECT_ID)");
@@ -53,7 +55,7 @@ module.exports = async ({ req, res, log, error }) => {
   const gql = async (query, variables) => {
     const r = await fetch("https://api.github.com/graphql", {
       method: "POST",
-      headers: { Authorization: `bearer ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),
     });
     const j = await r.json();

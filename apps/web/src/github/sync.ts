@@ -10,24 +10,38 @@ export async function getSelectedProject(): Promise<GhProject | null> {
   return ((await db.meta.get(PROJECT_KEY))?.value as GhProject | undefined) ?? null;
 }
 
-export async function setSelectedProject(p: GhProject | null): Promise<void> {
-  await db.meta.put({ key: PROJECT_KEY, value: p });
-  // Persist to Appwrite too so the cloud auto-syncer targets the chosen board.
-  if (appwriteConfigured && tablesDB) {
-    const now = new Date().toISOString();
-    try {
+/** Merge-write the settings.app row (partial), creating it if missing. */
+async function updateSettings(patch: Record<string, unknown>): Promise<void> {
+  if (!appwriteConfigured || !tablesDB) return;
+  const now = new Date().toISOString();
+  try {
+    await tablesDB.updateRow(DATABASE_ID, "settings", "app", { ...patch, updatedAt: now });
+  } catch (e) {
+    if ((e as { code?: number }).code === 404) {
       await tablesDB.upsertRow(DATABASE_ID, "settings", "app", {
-        githubProjectId: p?.id ?? null,
-        githubOwner: p?.owner ?? null,
-        githubTitle: p?.title ?? null,
+        ...patch,
         rev: 1,
         createdAt: now,
         updatedAt: now,
       });
-    } catch {
-      /* settings table may not exist yet; local choice still applies */
     }
+    /* else: settings unavailable; local choice still applies */
   }
+}
+
+export async function setSelectedProject(p: GhProject | null): Promise<void> {
+  await db.meta.put({ key: PROJECT_KEY, value: p });
+  // Persist to Appwrite so the cloud auto-syncer targets the chosen board.
+  await updateSettings({
+    githubProjectId: p?.id ?? null,
+    githubOwner: p?.owner ?? null,
+    githubTitle: p?.title ?? null,
+  });
+}
+
+/** Store a GitHub token the cloud auto-syncer will use (instead of the env var). */
+export async function saveGithubToken(token: string): Promise<void> {
+  await updateSettings({ githubToken: token.trim() || null });
 }
 
 export interface Diff {

@@ -128,21 +128,25 @@ function ShortcutsButton() {
 
 function UserChip() {
   const { name, email } = useAuth();
-  if (!name && !email) return null;
+  const signOut = () => logout().then(() => window.location.reload());
   return (
-    <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
-      <Avatar name={name ?? email} size={22} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[12px] text-ink">{name ?? "Me"}</div>
-        {email && <div className="truncate text-[11px] text-ink-tertiary">{email}</div>}
-      </div>
+    <div className="space-y-0.5">
+      {(name || email) && (
+        <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
+          <Avatar name={name ?? email} size={22} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[12px] text-ink">{name ?? "Me"}</div>
+            {email && <div className="truncate text-[11px] text-ink-tertiary">{email}</div>}
+          </div>
+        </div>
+      )}
       {appwriteConfigured && (
         <button
-          title="Sign out"
-          onClick={() => logout().then(() => window.location.reload())}
-          className="rounded p-1 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+          onClick={signOut}
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-ink-subtle hover:bg-surface-1 hover:text-danger"
         >
-          <LogOut className="h-3.5 w-3.5" />
+          <LogOut className="h-4 w-4" />
+          Log out
         </button>
       )}
     </div>
