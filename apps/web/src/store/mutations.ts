@@ -5,6 +5,8 @@ import {
   type Issue,
   type Priority,
   type RelationKind,
+  type State,
+  type StateType,
 } from "@offlinear/shared";
 import { db } from "@/db/db";
 import { commit } from "@/sync/engine";
@@ -63,6 +65,57 @@ export async function createIssue(
       entityId: id,
       type: "create",
       patch: full as Partial<Issue>,
+      baseRev: 0,
+      actorId: getActorId(),
+    })
+  );
+  return id;
+}
+
+/** Infer a workflow category from a GitHub Status name. */
+export function inferStateType(name: string): StateType {
+  const n = name.toLowerCase();
+  if (/(done|complete|closed|merged|shipped)/.test(n)) return "completed";
+  if (/(cancel|duplicate|won'?t|wontfix|invalid|reject)/.test(n)) return "canceled";
+  if (/(progress|review|doing|in\s|active|started)/.test(n)) return "started";
+  if (/backlog|icebox|triage/.test(n)) return "backlog";
+  return "unstarted";
+}
+
+const STATE_COLORS: Record<StateType, string> = {
+  backlog: "#8a8f98",
+  unstarted: "#a0a0a5",
+  started: "#f2c94c",
+  completed: "#27a644",
+  canceled: "#62666d",
+};
+
+/** Create a workflow state (column). Used when importing GitHub statuses that
+ *  don't exist locally. Returns its id. */
+export async function createState(input: {
+  name: string;
+  type?: StateType;
+  color?: string;
+}): Promise<string> {
+  const id = newOpId();
+  const type = input.type ?? inferStateType(input.name);
+  const states = await db.states.orderBy("position").toArray();
+  const position = (states.at(-1)?.position ?? -1) + 1;
+  const full: Omit<State, "createdAt" | "updatedAt" | "rev"> = {
+    id,
+    teamId: getTeamId() ?? "",
+    name: input.name,
+    type,
+    color: input.color ?? STATE_COLORS[type],
+    position,
+    githubOptionId: null,
+  };
+  await commit(
+    makeOp<State>({
+      entity: "states",
+      entityId: id,
+      type: "create",
+      patch: full as Partial<State>,
       baseRev: 0,
       actorId: getActorId(),
     })

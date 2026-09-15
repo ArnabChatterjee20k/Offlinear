@@ -126,6 +126,49 @@ export async function getProjectItems(projectId: string): Promise<GhItem[]> {
   return items;
 }
 
+export interface GhStatusField {
+  fieldId: string;
+  options: { id: string; name: string }[];
+}
+
+/** The project's "Status" single-select field + its options, if present. */
+export async function getStatusField(projectId: string): Promise<GhStatusField | null> {
+  const data = await gql<{
+    node: {
+      field: { id: string; options: { id: string; name: string }[] } | null;
+    };
+  }>(
+    `query($id: ID!) {
+      node(id: $id) {
+        ... on ProjectV2 {
+          field(name: "Status") {
+            ... on ProjectV2SingleSelectField { id options { id name } }
+          }
+        }
+      }
+    }`,
+    { id: projectId }
+  );
+  return data.node.field ? { fieldId: data.node.field.id, options: data.node.field.options } : null;
+}
+
+/** Set a project item's Status to the given single-select option. */
+export async function setItemStatus(
+  projectId: string,
+  itemId: string,
+  fieldId: string,
+  optionId: string
+): Promise<void> {
+  await gql(
+    `mutation($p: ID!, $item: ID!, $field: ID!, $opt: String!) {
+      updateProjectV2ItemFieldValue(
+        input: { projectId: $p, itemId: $item, fieldId: $field, value: { singleSelectOptionId: $opt } }
+      ) { projectV2Item { id } }
+    }`,
+    { p: projectId, item: itemId, field: fieldId, opt: optionId }
+  );
+}
+
 /** Create a draft issue on the project; returns the new item id. */
 export async function addDraftIssue(projectId: string, title: string, body: string): Promise<string> {
   const data = await gql<{ addProjectV2DraftIssue: { projectItem: { id: string } } }>(

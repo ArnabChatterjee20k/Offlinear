@@ -1,8 +1,15 @@
 import type { Issue } from "@offlinear/shared";
 import { db } from "@/db/db";
-import { createIssue } from "@/store/mutations";
+import { createIssue, createState } from "@/store/mutations";
 import { DATABASE_ID, appwriteConfigured, tablesDB } from "@/sync/appwrite-config";
-import { addDraftIssue, getProjectItems, type GhItem, type GhProject } from "./client";
+import {
+  addDraftIssue,
+  getProjectItems,
+  getStatusField,
+  setItemStatus,
+  type GhItem,
+  type GhProject,
+} from "./client";
 
 const PROJECT_KEY = "github.project";
 
@@ -86,28 +93,58 @@ export async function computeDiff(projectId: string): Promise<Diff> {
 }
 
 /** Push selected local issues as draft items and record the mapping. */
+const normName = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+
 export async function pushIssues(
   projectId: string,
   issues: Issue[],
   onProgress?: (done: number, total: number) => void
 ): Promise<void> {
+  // Map each issue's state → the project's matching Status option.
+  const states = await db.states.toArray();
+  const stateName = new Map(states.map((s) => [s.id, s.name]));
+  const statusField = await getStatusField(projectId);
+  const optByName = new Map(
+    (statusField?.options ?? []).map((o) => [normName(o.name), o.id])
+  );
+
   let done = 0;
   for (const issue of issues) {
     const itemId = await addDraftIssue(projectId, issue.title, issue.description);
+    if (statusField) {
+      const optId = optByName.get(normName(stateName.get(issue.stateId) ?? ""));
+      if (optId) await setItemStatus(projectId, itemId, statusField.fieldId, optId);
+    }
     await db.ghmap.put({ issueId: issue.id, itemId, projectId });
     onProgress?.(++done, issues.length);
   }
 }
 
-/** Import selected GitHub items as new local issues and record the mapping. */
+/** Import selected GitHub items as new local issues, placing each in the state
+ *  matching its GitHub Status — creating that column if it doesn't exist yet.
+ *  Records the mapping. */
 export async function importItems(
   projectId: string,
   items: GhItem[],
   onProgress?: (done: number, total: number) => void
 ): Promise<void> {
+  const states = await db.states.toArray();
+  const nameToId = new Map(states.map((s) => [normName(s.name), s.id]));
+
+  const ensureState = async (status: string | null): Promise<string | undefined> => {
+    if (!status) return undefined;
+    const key = normName(status);
+    const found = nameToId.get(key);
+    if (found) return found;
+    const id = await createState({ name: status });
+    nameToId.set(key, id);
+    return id;
+  };
+
   let done = 0;
   for (const item of items) {
-    const id = await createIssue({ title: item.title });
+    const stateId = await ensureState(item.status);
+    const id = await createIssue({ title: item.title, stateId });
     await db.ghmap.put({ issueId: id, itemId: item.itemId, projectId });
     onProgress?.(++done, items.length);
   }

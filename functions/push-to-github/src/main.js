@@ -80,6 +80,34 @@ module.exports = async ({ req, res, log, error }) => {
   );
   const itemId = data.addProjectV2DraftIssue.projectItem.id;
 
+  // Set the item's Status to match the issue's state column.
+  try {
+    const stateRes = await aw(`states/rows/${issue.stateId}`);
+    const stateName = stateRes.ok ? (await stateRes.json()).name : null;
+    if (stateName) {
+      const fd = await gql(
+        `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
+          field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } } } }`,
+        { id: projectId }
+      );
+      const field = fd.node && fd.node.field;
+      if (field) {
+        const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+        const opt = field.options.find((o) => norm(o.name) === norm(stateName));
+        if (opt) {
+          await gql(
+            `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
+              updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } }
+            }`,
+            { p: projectId, i: itemId, f: field.id, o: opt.id }
+          );
+        }
+      }
+    }
+  } catch (e) {
+    log(`status set skipped: ${e.message}`);
+  }
+
   const now = new Date().toISOString();
   const put = await aw(`sync_map/rows/${issue.$id}`, {
     method: "PUT",
