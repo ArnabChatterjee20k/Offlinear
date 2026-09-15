@@ -11,6 +11,8 @@ import { AppwriteAdapter } from "./sync/appwrite-adapter";
 import { currentAccount, ensureMember } from "./auth";
 import { setSession } from "./store/session";
 import { useAuth } from "./store/auth";
+import { useUI } from "./store/ui";
+import { getSelectedProject } from "./github/sync";
 
 async function bootstrap() {
   const root = ReactDOM.createRoot(document.getElementById("root")!);
@@ -34,6 +36,11 @@ async function bootstrap() {
     const team = (await db.teams.toArray())[0] ?? null;
     setSession({ actorId: memberId, teamId: team?.id ?? null });
     initSync();
+
+    // First run: no board connected yet → open the GitHub connect step
+    // (choose gh CLI or OAuth, then pick a board).
+    if (!(await getSelectedProject())) useUI.getState().setGithub(true);
+
     render(<App />);
     return;
   }
