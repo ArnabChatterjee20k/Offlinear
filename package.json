@@ -11,7 +11,8 @@
     "seed": "pnpm --filter @offlinear/scripts seed",
     "schema:push": "pnpm --filter @offlinear/scripts schema:push",
     "import": "pnpm --filter @offlinear/scripts run import",
-    "serve": "bun run apps/server/server.ts"
+    "serve": "bun run apps/server/server.ts",
+    "deploy:functions": "pnpm --filter @offlinear/scripts run deploy:functions"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

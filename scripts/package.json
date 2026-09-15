@@ -6,7 +6,8 @@
   "scripts": {
     "seed": "tsx csv-to-seed.ts",
     "schema:push": "tsx schema-push.ts",
-    "import": "tsx import-csv.ts"
+    "import": "tsx import-csv.ts",
+    "deploy:functions": "tsx deploy-functions.ts"
   },
   "dependencies": {
     "@offlinear/shared": "workspace:*",

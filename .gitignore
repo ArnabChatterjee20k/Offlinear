@@ -8,3 +8,4 @@ apps/web/public/seed.json
 
 # source data (personal)
 arnab@appwrite.io*.csv
+functions/*.tar.gz

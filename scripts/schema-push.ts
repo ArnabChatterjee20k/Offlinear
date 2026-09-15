@@ -112,6 +112,15 @@ const TABLES: Table[] = [
     ],
     indexes: [{ key: "issueId", attrs: ["issueId"] }],
   },
+  {
+    // Server-side GitHub mapping (row id = issue id). Written by the
+    // push-to-github function; not synced to the client.
+    id: "sync_map",
+    attrs: [
+      { name: "itemId", kind: "string", size: 64, required: true },
+      { name: "projectId", kind: "string", size: 64 },
+    ],
+  },
 ];
 
 const ignore409 = async (p: Promise<unknown>, label: string) => {
