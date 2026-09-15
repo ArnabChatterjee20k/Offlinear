@@ -1,4 +1,4 @@
-import { Command, Plus } from "lucide-react";
+import { Command, Plus, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/primitives";
@@ -28,6 +28,7 @@ function SyncDot() {
 export function TopBar() {
   const openPalette = useUI((s) => s.openPalette);
   const openCreate = useUI((s) => s.openCreate);
+  const setGithub = useUI((s) => s.setGithub);
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-hairline px-5">
       <h2 className="text-[14px] font-medium text-ink">Board</h2>
@@ -40,6 +41,13 @@ export function TopBar() {
           <Command className="h-3.5 w-3.5" />
           Search…
           <Kbd>{MOD}K</Kbd>
+        </button>
+        <button
+          onClick={() => setGithub(true)}
+          title="Sync with GitHub"
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-hairline text-ink-subtle hover:border-hairline-strong hover:text-ink"
+        >
+          <Github className="h-3.5 w-3.5" />
         </button>
         <Button variant="primary" size="sm" onClick={() => openCreate()}>
           <Plus className="h-3.5 w-3.5" />

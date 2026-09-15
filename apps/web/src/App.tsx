@@ -5,6 +5,7 @@ import { IssuePanel } from "./components/IssuePanel";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { CreateIssueModal } from "./components/CreateIssueModal";
+import { GitHubDialog } from "./components/GitHubDialog";
 import { useKeyboard } from "./hooks/useKeyboard";
 
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
       <CommandPalette />
       <ShortcutsHelp />
       <CreateIssueModal />
+      <GitHubDialog />
     </div>
   );
 }

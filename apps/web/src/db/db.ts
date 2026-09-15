@@ -10,6 +10,13 @@ import type {
   Team,
 } from "@offlinear/shared";
 
+/** Local mapping between an issue and its GitHub Projects v2 item. */
+export interface GhMap {
+  issueId: string;
+  itemId: string;
+  projectId: string;
+}
+
 /** An unsent issue being composed. Local-only; never synced. */
 export interface Draft {
   id: string;
@@ -48,6 +55,7 @@ export class OfflinearDB extends Dexie {
   outbox!: EntityTable<OutboxEntry, "opId">;
   meta!: EntityTable<Meta, "key">;
   drafts!: EntityTable<Draft, "id">;
+  ghmap!: EntityTable<GhMap, "issueId">;
 
   constructor() {
     super("offlinear");
@@ -62,6 +70,7 @@ export class OfflinearDB extends Dexie {
       meta: "key",
     });
     this.version(2).stores({ drafts: "id, updatedAt" });
+    this.version(3).stores({ ghmap: "issueId, itemId" });
   }
 }
 

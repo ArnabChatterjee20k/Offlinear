@@ -22,13 +22,26 @@ export async function currentAccount(): Promise<Models.User<Models.Preferences> 
 export function loginWithGitHub(): void {
   const here = window.location.origin + window.location.pathname;
   // v27 returns the authorize URL (older SDKs redirected for us).
+  // `project` grants read/write to Projects v2 (for GitHub sync).
   const url = account?.createOAuth2Session(
     OAuthProvider.Github,
     here,
     here,
-    ["read:user", "user:email"]
+    ["read:user", "user:email", "project"]
   );
   if (typeof url === "string") window.location.href = url;
+}
+
+/** The GitHub access token from the current Appwrite OAuth session, if any. */
+export async function githubToken(): Promise<string | null> {
+  try {
+    const s = (await account!.getSession("current")) as unknown as {
+      providerAccessToken?: string;
+    };
+    return s.providerAccessToken || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {

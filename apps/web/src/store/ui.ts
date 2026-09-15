@@ -20,6 +20,7 @@ interface UIState {
   anchorId: string | null;
   palette: Palette;
   helpOpen: boolean;
+  githubOpen: boolean;
   /** Create-issue modal: closed (null) or open, optionally editing a draft /
    *  pre-filling a state. */
   create: { open: boolean; draftId?: string; stateId?: string } | null;
@@ -34,6 +35,7 @@ interface UIState {
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
   setHelp: (open: boolean) => void;
+  setGithub: (open: boolean) => void;
   openCreate: (opts?: { draftId?: string; stateId?: string }) => void;
   closeCreate: () => void;
 }
@@ -45,6 +47,7 @@ export const useUI = create<UIState>((set) => ({
   anchorId: null,
   palette: { open: false, mode: "root", targets: [] },
   helpOpen: false,
+  githubOpen: false,
   create: null,
 
   openIssue: (id) => set({ openIssueId: id }),
@@ -68,6 +71,7 @@ export const useUI = create<UIState>((set) => ({
     set({ palette: { open: true, mode, targets } }),
   closePalette: () => set((s) => ({ palette: { ...s.palette, open: false } })),
   setHelp: (open) => set({ helpOpen: open }),
+  setGithub: (open) => set({ githubOpen: open }),
   openCreate: (opts) => set({ create: { open: true, ...opts } }),
   closeCreate: () => set({ create: null }),
 }));
