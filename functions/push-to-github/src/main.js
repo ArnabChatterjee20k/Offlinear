@@ -1,56 +1,22 @@
-// Auto-syncer: on any issues row create/update, mirror the issue to the
-// configured GitHub Projects v2 board as a draft item, recording the mapping in
-// the sync_map table. Idempotent — an already-mapped issue is left alone.
+// GitHub auto-syncer. Two entry points:
+//   • Event (issues row create/update): mirror that one issue.
+//   • Schedule (daily): scan all issues and mirror any not yet on GitHub.
 //
-// Runs in Appwrite's cloud, so it uses a stored GitHub token (GITHUB_TOKEN),
-// NOT the gh CLI. Dependency-free: talks to Appwrite REST + GitHub GraphQL with
-// fetch. Function variables: APPWRITE_API_KEY, APPWRITE_DATABASE_ID,
-// GITHUB_TOKEN, GITHUB_PROJECT_ID.
+// Runs in Appwrite's cloud → uses a stored GitHub token (GITHUB_TOKEN or
+// settings.app.githubToken), NOT the gh CLI. The board comes from each issue's
+// project (projects.{id}.githubProjectId). Dependency-free (fetch only).
 
-module.exports = async ({ req, res, log, error }) => {
-  const {
-    APPWRITE_FUNCTION_API_ENDPOINT: ENDPOINT,
-    APPWRITE_FUNCTION_PROJECT_ID: PROJECT,
-    APPWRITE_API_KEY: KEY,
-    APPWRITE_DATABASE_ID: DB,
-    GITHUB_TOKEN,
-    GITHUB_PROJECT_ID,
-  } = process.env;
-
-  const event = req.headers["x-appwrite-event"] || "";
-  if (event.includes(".delete")) return res.json({ skipped: "delete" });
-
-  const issue = req.bodyJson;
-  if (!issue || !issue.$id) return res.json({ skipped: "no row" });
-
+function makeClient({ endpoint, project, key, token }) {
   const aw = (path, init = {}) =>
-    fetch(`${ENDPOINT}/tablesdb/${DB}/tables/${path}`, {
+    fetch(`${endpoint}/tablesdb/${path}`, {
       ...init,
       headers: {
-        "X-Appwrite-Project": PROJECT,
-        "X-Appwrite-Key": KEY,
+        "X-Appwrite-Project": project,
+        "X-Appwrite-Key": key,
         "Content-Type": "application/json",
         ...(init.headers || {}),
       },
     });
-
-  // Board + token chosen in the UI (settings row "app") win over the env vars.
-  let projectId = GITHUB_PROJECT_ID;
-  let token = GITHUB_TOKEN;
-  const settings = await aw(`settings/rows/app`);
-  if (settings.ok) {
-    const s = await settings.json();
-    if (s.githubProjectId) projectId = s.githubProjectId;
-    if (s.githubToken) token = s.githubToken;
-  }
-  if (!token) {
-    error("No GitHub token (settings.app.githubToken or GITHUB_TOKEN)");
-    return res.json({ error: "no token" }, 500);
-  }
-  if (!projectId) {
-    error("No GitHub project selected (settings.app or GITHUB_PROJECT_ID)");
-    return res.json({ error: "no project" }, 500);
-  }
 
   const gql = async (query, variables) => {
     const r = await fetch("https://api.github.com/graphql", {
@@ -63,18 +29,29 @@ module.exports = async ({ req, res, log, error }) => {
     return j.data;
   };
 
-  // Already mirrored?
-  const existing = await aw(`sync_map/rows/${issue.$id}`);
+  return { aw, gql };
+}
+
+const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+
+/** Mirror one issue to its project's GitHub board. Idempotent. */
+async function syncIssue(issue, { aw, gql, db, log }) {
+  if (!issue || !issue.$id) return { skipped: "no row" };
+
+  const existing = await aw(`${db}/tables/sync_map/rows/${issue.$id}`);
   if (existing.ok) {
     const row = await existing.json();
-    if (row.itemId) return res.json({ ok: true, itemId: row.itemId, action: "exists" });
+    if (row.itemId) return { action: "exists" };
   }
+
+  if (!issue.projectId) return { skipped: "no project" };
+  const projRes = await aw(`${db}/tables/projects/rows/${issue.projectId}`);
+  const projectId = projRes.ok ? (await projRes.json()).githubProjectId : null;
+  if (!projectId) return { skipped: "project not linked" };
 
   const data = await gql(
     `mutation($p: ID!, $t: String!, $b: String) {
-      addProjectV2DraftIssue(input: { projectId: $p, title: $t, body: $b }) {
-        projectItem { id }
-      }
+      addProjectV2DraftIssue(input: { projectId: $p, title: $t, body: $b }) { projectItem { id } }
     }`,
     { p: projectId, t: issue.title, b: issue.description || "" }
   );
@@ -82,8 +59,8 @@ module.exports = async ({ req, res, log, error }) => {
 
   // Set the item's Status to match the issue's state column.
   try {
-    const stateRes = await aw(`states/rows/${issue.stateId}`);
-    const stateName = stateRes.ok ? (await stateRes.json()).name : null;
+    const stRes = await aw(`${db}/tables/states/rows/${issue.stateId}`);
+    const stateName = stRes.ok ? (await stRes.json()).name : null;
     if (stateName) {
       const fd = await gql(
         `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
@@ -91,17 +68,14 @@ module.exports = async ({ req, res, log, error }) => {
         { id: projectId }
       );
       const field = fd.node && fd.node.field;
-      if (field) {
-        const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
-        const opt = field.options.find((o) => norm(o.name) === norm(stateName));
-        if (opt) {
-          await gql(
-            `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
-              updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } }
-            }`,
-            { p: projectId, i: itemId, f: field.id, o: opt.id }
-          );
-        }
+      const opt = field && field.options.find((o) => norm(o.name) === norm(stateName));
+      if (opt) {
+        await gql(
+          `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
+            updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } }
+          }`,
+          { p: projectId, i: itemId, f: field.id, o: opt.id }
+        );
       }
     }
   } catch (e) {
@@ -109,17 +83,69 @@ module.exports = async ({ req, res, log, error }) => {
   }
 
   const now = new Date().toISOString();
-  const put = await aw(`sync_map/rows/${issue.$id}`, {
+  await aw(`${db}/tables/sync_map/rows/${issue.$id}`, {
     method: "PUT",
-    body: JSON.stringify({
-      data: { itemId, projectId, rev: 1, createdAt: now, updatedAt: now },
-    }),
+    body: JSON.stringify({ data: { itemId, projectId, rev: 1, createdAt: now, updatedAt: now } }),
   });
-  if (!put.ok) {
-    error(`sync_map write failed: ${put.status} ${await put.text()}`);
-    return res.json({ error: "mapping write failed" }, 500);
+  log(`pushed ${issue.key || issue.$id} -> ${itemId}`);
+  return { action: "created", itemId };
+}
+
+module.exports = async ({ req, res, log, error }) => {
+  const {
+    APPWRITE_FUNCTION_API_ENDPOINT: endpoint,
+    APPWRITE_FUNCTION_PROJECT_ID: project,
+    APPWRITE_API_KEY: key,
+    APPWRITE_DATABASE_ID: db,
+    GITHUB_TOKEN,
+  } = process.env;
+
+  // Token: settings.app.githubToken (global) overrides the env var.
+  let token = GITHUB_TOKEN;
+  const base = makeClient({ endpoint, project, key, token: token || "" });
+  const settings = await base.aw(`${db}/tables/settings/rows/app`);
+  if (settings.ok) {
+    const s = await settings.json();
+    if (s.githubToken) token = s.githubToken;
+  }
+  if (!token) {
+    error("No GitHub token (settings.app.githubToken or GITHUB_TOKEN)");
+    return res.json({ error: "no token" }, 500);
+  }
+  const { aw, gql } = makeClient({ endpoint, project, key, token });
+  const ctx = { aw, gql, db, log };
+
+  const event = req.headers["x-appwrite-event"] || "";
+
+  // Event trigger → sync the single changed issue.
+  if (event) {
+    if (event.includes(".delete")) return res.json({ skipped: "delete" });
+    return res.json(await syncIssue(req.bodyJson, ctx));
   }
 
-  log(`pushed ${issue.key || issue.$id} -> ${itemId}`);
-  return res.json({ ok: true, itemId, action: "created" });
+  // Scheduled run → reconcile: push any issues not yet on GitHub.
+  let cursor = null;
+  let created = 0;
+  let scanned = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const queries = [JSON.stringify({ method: "limit", values: [100] })];
+    if (cursor) queries.push(JSON.stringify({ method: "cursorAfter", values: [cursor] }));
+    const qs = queries.map((q) => `queries[]=${encodeURIComponent(q)}`).join("&");
+    const page = await aw(`${db}/tables/issues/rows?${qs}`);
+    if (!page.ok) {
+      error(`list issues failed: ${page.status}`);
+      break;
+    }
+    const { rows } = await page.json();
+    for (const issue of rows) {
+      scanned++;
+      const r = await syncIssue(issue, ctx);
+      if (r.action === "created") created++;
+    }
+    if (rows.length < 100) break;
+    cursor = rows[rows.length - 1].$id;
+  }
+  log(`reconcile: scanned ${scanned}, created ${created}`);
+  return res.json({ ok: true, scanned, created });
 };

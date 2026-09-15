@@ -48,6 +48,8 @@ const events = [
   `databases.${APPWRITE_DATABASE_ID}.tables.issues.rows.*.create`,
   `databases.${APPWRITE_DATABASE_ID}.tables.issues.rows.*.update`,
 ];
+// Daily reconcile sweep (03:00 UTC): push any issues not yet on GitHub.
+const SCHEDULE = process.env.SYNC_SCHEDULE ?? "0 3 * * *";
 
 const variables: Record<string, string> = {
   APPWRITE_API_KEY: APPWRITE_API_KEY!,
@@ -66,7 +68,7 @@ async function main() {
       Runtime.Node22,
       undefined,
       events,
-      undefined,
+      SCHEDULE,
       15,
       true,
       true,
@@ -76,7 +78,7 @@ async function main() {
     console.log("  + created function");
   } catch (e: any) {
     if (e?.code === 409) {
-      await fns.update(FN, FN, Runtime.Node22, undefined, events, undefined, 15, true, true, "src/main.js", "npm install");
+      await fns.update(FN, FN, Runtime.Node22, undefined, events, SCHEDULE, 15, true, true, "src/main.js", "npm install");
       console.log("  = function exists (events updated)");
     } else throw e;
   }

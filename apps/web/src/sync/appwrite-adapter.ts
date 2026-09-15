@@ -3,7 +3,15 @@ import type { EntityName, Op } from "@offlinear/shared";
 import type { PullResult, PushResult, SyncAdapter } from "./adapter";
 import { DATABASE_ID, account, client, tablesDB } from "./appwrite-config";
 
-const TABLES: EntityName[] = ["teams", "states", "labels", "members", "issues", "comments"];
+const TABLES: EntityName[] = [
+  "teams",
+  "projects",
+  "states",
+  "labels",
+  "members",
+  "issues",
+  "comments",
+];
 
 /** Strip Appwrite system ($-prefixed) fields and re-key $id → id. */
 function toRow(row: Models.Row): Record<string, unknown> {
@@ -49,7 +57,15 @@ export class AppwriteAdapter implements SyncAdapter {
     const data = clean(op.patch as Record<string, unknown>);
     try {
       if (op.type === "create") {
-        await tablesDB!.upsertRow(DATABASE_ID, table, op.entityId, data);
+        // createRow (not upsertRow) so Appwrite fires the `.create` event the
+        // auto-syncer listens for; fall back to update on a create race.
+        try {
+          await tablesDB!.createRow(DATABASE_ID, table, op.entityId, data);
+        } catch (e) {
+          if ((e as { code?: number }).code === 409) {
+            await tablesDB!.updateRow(DATABASE_ID, table, op.entityId, data);
+          } else throw e;
+        }
       } else if (op.type === "update") {
         await tablesDB!.updateRow(DATABASE_ID, table, op.entityId, data);
       } else {
