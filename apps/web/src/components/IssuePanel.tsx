@@ -1,18 +1,58 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogClose, DialogTitle, SheetContent } from "./ui/dialog";
-import { X, ChevronUp } from "lucide-react";
+import { ArrowLeft, ChevronUp, MoreHorizontal, Trash2, Link2, Archive } from "lucide-react";
 import { PRIORITY_LABELS, type Issue } from "@offlinear/shared";
 import { PriorityIcon, StateIcon } from "./icons";
 import { Avatar } from "./ui/primitives";
 import { AssigneePicker, LabelPicker, PriorityPicker, StatePicker } from "./pickers";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Comments } from "./Comments";
 import { SubIssues } from "./SubIssues";
 import { Relations } from "./Relations";
 import { Markdown } from "./Markdown";
 import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
-import { updateIssue } from "@/store/mutations";
+import { deleteIssue, updateIssue } from "@/store/mutations";
+
+function IssueMenu({ issue, onDeleted }: { issue: Issue; onDeleted: () => void }) {
+  const copyLink = () =>
+    navigator.clipboard?.writeText(`${window.location.origin}/issue/${issue.id}`);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink">
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={copyLink}>
+          <Link2 className="h-3.5 w-3.5" /> Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => updateIssue(issue.id, { archivedAt: new Date().toISOString() })}
+        >
+          <Archive className="h-3.5 w-3.5" /> Archive
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-danger focus:text-danger"
+          onSelect={() => {
+            void deleteIssue(issue.id);
+            onDeleted();
+          }}
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Delete issue
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const PropButton = React.forwardRef<
   HTMLButtonElement,
@@ -31,7 +71,7 @@ const PropButton = React.forwardRef<
 ));
 PropButton.displayName = "PropButton";
 
-function Body({ issue }: { issue: Issue }) {
+export function IssueBody({ issue, onBack }: { issue: Issue; onBack: () => void }) {
   const { stateById, memberById, labelById } = useLookups();
   const openIssue = useUI((s) => s.openIssue);
   const parent = useIssue(issue.parentId);
@@ -51,12 +91,17 @@ function Body({ issue }: { issue: Issue }) {
   return (
     <>
       <div className="flex items-center gap-2 border-b border-hairline px-5 py-2.5">
+        <button
+          onClick={onBack}
+          className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+          title="Back to board"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
         <StateIcon state={state} />
         <span className="font-mono text-[12px] text-ink-tertiary">{issue.key}</span>
-        <div className="ml-auto flex items-center gap-1">
-          <DialogClose className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink">
-            <X className="h-4 w-4" />
-          </DialogClose>
+        <div className="ml-auto">
+          <IssueMenu issue={issue} onDeleted={onBack} />
         </div>
       </div>
 
@@ -199,19 +244,3 @@ function Prop({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-export function IssuePanel() {
-  const openIssueId = useUI((s) => s.openIssueId);
-  const openIssue = useUI((s) => s.openIssue);
-  const issue = useIssue(openIssueId);
-
-  return (
-    <Dialog open={!!openIssueId} onOpenChange={(o) => !o && openIssue(null)}>
-      {issue && (
-        <SheetContent aria-describedby={undefined}>
-          <DialogTitle className="sr-only">{issue.title}</DialogTitle>
-          <Body issue={issue} />
-        </SheetContent>
-      )}
-    </Dialog>
-  );
-}

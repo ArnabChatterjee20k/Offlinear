@@ -4,6 +4,7 @@ import { useUI } from "@/store/ui";
 import { deleteIssues } from "@/store/mutations";
 import { redo, undo } from "@/store/history";
 import { boardCardIds } from "@/lib/board-order";
+import { openIssuePage, useRoute } from "@/store/route";
 
 const isTyping = (el: EventTarget | null) => {
   const n = el as HTMLElement | null;
@@ -51,7 +52,10 @@ export function useKeyboard() {
 
       if (e.key === "Escape") {
         if (s.palette.open || s.helpOpen) return; // Dialog handles it
-        if (s.openIssueId) return; // Sheet handles it
+        if (useRoute.getState().issueId) {
+          openIssuePage(null); // leave the issue page
+          return;
+        }
         if (s.selection.size) s.clearSelection();
         return;
       }

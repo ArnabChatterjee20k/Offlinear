@@ -1,26 +1,33 @@
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { Board } from "./components/Board";
-import { IssuePanel } from "./components/IssuePanel";
+import { IssueView } from "./components/IssueView";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { CreateIssueModal } from "./components/CreateIssueModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { GitHubDialog } from "./components/GitHubDialog";
 import { useKeyboard } from "./hooks/useKeyboard";
+import { useRoute } from "./store/route";
 
 export function App() {
   useKeyboard();
+  const issueId = useRoute((s) => s.issueId);
   return (
     <div className="flex h-full w-full overflow-hidden bg-canvas">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <div className="min-h-0 flex-1">
-          <Board />
-        </div>
+        {issueId ? (
+          <IssueView issueId={issueId} />
+        ) : (
+          <>
+            <TopBar />
+            <div className="min-h-0 flex-1">
+              <Board />
+            </div>
+          </>
+        )}
       </main>
-      <IssuePanel />
       <CommandPalette />
       <ShortcutsHelp />
       <CreateIssueModal />

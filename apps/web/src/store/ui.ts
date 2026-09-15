@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { db } from "@/db/db";
+import { openIssuePage } from "./route";
 
 export type PaletteMode = "root" | "status" | "priority" | "assignee" | "label";
 
@@ -67,7 +68,11 @@ export const useUI = create<UIState>((set) => ({
   setCreateProject: (open) => set({ createProjectOpen: open }),
   create: null,
 
-  openIssue: (id) => set({ openIssueId: id }),
+  // Opening an issue now navigates to its full page (not the slide-over).
+  openIssue: (id) => {
+    set({ openIssueId: id });
+    openIssuePage(id);
+  },
   setFocus: (id) => set({ focusedIssueId: id }),
   toggleSelect: (id) =>
     set((s) => {
