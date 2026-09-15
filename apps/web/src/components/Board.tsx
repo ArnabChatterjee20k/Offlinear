@@ -19,6 +19,7 @@ import { useBoardIssues, useStates } from "@/hooks/useData";
 import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
 import { moveIssue } from "@/store/mutations";
+import { batch } from "@/store/history";
 import { boardCardIds } from "@/lib/board-order";
 
 const PAGE = 25; // cards rendered per column before lazy-loading more
@@ -44,8 +45,11 @@ function handleCardClick(e: React.MouseEvent, id: string) {
     e.preventDefault();
     ui.toggleSelect(id);
     ui.setFocus(id);
+  } else if (ui.shiftHeld || ui.selection.size > 0) {
+    // In selection mode a plain click toggles instead of opening.
+    ui.toggleSelect(id);
+    ui.setFocus(id);
   } else {
-    ui.clearSelection();
     ui.setAnchor(id);
     ui.setFocus(id);
     ui.openIssue(id);
@@ -54,6 +58,8 @@ function handleCardClick(e: React.MouseEvent, id: string) {
 
 function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
   const selected = useUI((s) => s.selection.has(issue.id));
+  const selectable = useUI((s) => s.shiftHeld || s.selection.size > 0);
+  const toggleSelect = useUI((s) => s.toggleSelect);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: issue.id });
   return (
     <div ref={setNodeRef} className={cn(isDragging && "opacity-40")}>
@@ -61,6 +67,8 @@ function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
         issue={issue}
         focused={focused}
         selected={selected}
+        selectable={selectable}
+        onToggleSelect={toggleSelect}
         onClick={(e) => handleCardClick(e, issue.id)}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
@@ -137,6 +145,8 @@ export function Board() {
   }, [states, issues]);
 
   const active = activeId ? issues.find((i) => i.id === activeId) : null;
+  const selection = useUI((s) => s.selection);
+  const dragCount = activeId && selection.has(activeId) ? selection.size : 1;
 
   function onDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
@@ -146,8 +156,15 @@ export function Board() {
     const over = e.over?.id ? String(e.over.id) : null;
     const id = String(e.active.id);
     if (!over) return;
-    const issue = issues.find((i) => i.id === id);
-    if (issue && issue.stateId !== over) void moveIssue(id, over);
+    // Move the whole selection when dragging a selected card; else just this one.
+    const sel = useUI.getState().selection;
+    const ids = sel.has(id) && sel.size > 1 ? [...sel] : [id];
+    void batch(async () => {
+      for (const iid of ids) {
+        const issue = issues.find((i) => i.id === iid);
+        if (issue && issue.stateId !== over) await moveIssue(iid, over);
+      }
+    });
   }
 
   return (
@@ -161,8 +178,13 @@ export function Board() {
         </div>
         <DragOverlay dropAnimation={null}>
           {active ? (
-            <div className="w-[290px] rotate-1">
+            <div className="relative w-[290px] rotate-1">
               <IssueCard issue={active} />
+              {dragCount > 1 && (
+                <span className="absolute -right-2 -top-2 grid h-6 min-w-6 place-items-center rounded-full bg-brand px-1.5 text-[12px] font-medium text-white shadow-lg">
+                  {dragCount}
+                </span>
+              )}
             </div>
           ) : null}
         </DragOverlay>

@@ -4,8 +4,10 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 import { useUI } from "@/store/ui";
+import { Terminal } from "lucide-react";
 import { githubToken, loginWithGitHub, logout } from "@/auth";
 import { listProjects, type GhItem, type GhProject } from "@/github/client";
+import { bridgeHealth, setMode, BRIDGE_URL } from "@/github/config";
 import {
   computeDiff,
   getSelectedProject,
@@ -33,7 +35,8 @@ export function GitHubDialog() {
   const [importSel, setImportSel] = React.useState<Set<string>>(new Set());
   const [progress, setProgress] = React.useState<string | null>(null);
 
-  // Initialise when opened.
+  // Initialise when opened: go straight to sync if a board is chosen, else the
+  // connection chooser (OAuth vs gh CLI).
   React.useEffect(() => {
     if (!open) return;
     setError(null);
@@ -43,27 +46,46 @@ export function GitHubDialog() {
       if (sel) {
         setSelected(sel);
         setPhase("sync");
-        return;
-      }
-      const token = await githubToken();
-      if (!token) {
-        setPhase("connect");
-        return;
-      }
-      setPhase("loading");
-      try {
-        setProjects(await listProjects());
-        setPhase("pick");
-      } catch (e) {
-        setError(String((e as Error).message));
+      } else {
         setPhase("connect");
       }
     })();
   }, [open]);
 
-  const reconnect = async () => {
-    await logout();
-    loginWithGitHub();
+  const loadProjects = async () => {
+    setPhase("loading");
+    setError(null);
+    try {
+      setProjects(await listProjects());
+      setPhase("pick");
+    } catch (e) {
+      setError(String((e as Error).message));
+      setPhase("connect");
+    }
+  };
+
+  const connectOAuth = async () => {
+    await setMode("oauth");
+    const token = await githubToken();
+    if (!token) {
+      await logout();
+      loginWithGitHub();
+      return;
+    }
+    await loadProjects();
+  };
+
+  const connectCli = async () => {
+    await setMode("cli");
+    setPhase("loading");
+    setError(null);
+    const health = await bridgeHealth();
+    if (!health.ok) {
+      setError(health.error ?? "gh-bridge unavailable");
+      setPhase("connect");
+      return;
+    }
+    await loadProjects();
   };
 
   const choose = async (p: GhProject) => {
@@ -121,13 +143,8 @@ export function GitHubDialog() {
               onClick={() => {
                 setSelected(null);
                 setSelectedProject(null);
-                setPhase("pick");
-                setProjects([]);
-                setPhase("loading");
-                listProjects().then((p) => {
-                  setProjects(p);
-                  setPhase("pick");
-                }).catch(() => setPhase("connect"));
+                setDiff(null);
+                void loadProjects();
               }}
               className="ml-auto text-[12px] text-ink-subtle hover:text-ink"
             >
@@ -150,16 +167,46 @@ export function GitHubDialog() {
           )}
 
           {phase === "connect" && (
-            <div className="py-4 text-center">
-              <p className="text-[14px] text-ink-muted">
-                Grant access to your GitHub Projects to sync.
-              </p>
-              <p className="mt-1 text-[12px] text-ink-tertiary">
-                You'll re-authorize with the <code className="text-ink-subtle">project</code> scope.
-              </p>
-              <Button variant="primary" className="mt-4" onClick={reconnect}>
-                <Github className="h-4 w-4" /> Connect GitHub Projects
-              </Button>
+            <div className="space-y-3 py-2">
+              <button
+                onClick={connectOAuth}
+                className="flex w-full items-start gap-3 rounded-lg border border-hairline px-4 py-3 text-left hover:border-hairline-strong hover:bg-surface-1"
+              >
+                <Github className="mt-0.5 h-4 w-4 text-ink" />
+                <div>
+                  <div className="text-[14px] text-ink">Continue with GitHub</div>
+                  <div className="text-[12px] text-ink-tertiary">
+                    Browser OAuth with the <code className="text-ink-subtle">project</code> scope.
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={connectCli}
+                className="flex w-full items-start gap-3 rounded-lg border border-hairline px-4 py-3 text-left hover:border-hairline-strong hover:bg-surface-1"
+              >
+                <Terminal className="mt-0.5 h-4 w-4 text-ink" />
+                <div>
+                  <div className="text-[14px] text-ink">Continue with gh CLI (local)</div>
+                  <div className="text-[12px] text-ink-tertiary">
+                    Uses your local <code className="text-ink-subtle">gh</code> auth via the bridge —
+                    no browser sign-in.
+                  </div>
+                </div>
+              </button>
+
+              {error && (
+                <div className="rounded-md border border-hairline bg-surface-1 px-3 py-2 text-[12px] text-ink-subtle">
+                  Start the server, then retry:
+                  <pre className="mt-1 overflow-x-auto rounded bg-surface-3 px-2 py-1 font-mono text-[11px] text-ink">
+                    pnpm serve
+                  </pre>
+                  <span className="text-ink-tertiary">
+                    Requires <code>bun</code> and a signed-in <code>gh</code> (or GH_TOKEN). API at{" "}
+                    <code>{BRIDGE_URL}</code>.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
