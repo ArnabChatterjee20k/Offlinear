@@ -68,26 +68,32 @@ export class AppwriteAdapter implements SyncAdapter {
 
   async pullSince(cursor: string | null): Promise<PullResult> {
     await this.ensureSession();
-    const rows: PullResult["rows"] = [];
-    let maxUpdated = cursor ?? "";
 
-    for (const table of TABLES) {
-      let after = cursor;
-      // Page ascending by updatedAt until a short page.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const queries = [Query.orderAsc("updatedAt"), Query.limit(100)];
-        if (after) queries.push(Query.greaterThan("updatedAt", after));
-        const res = await tablesDB!.listRows(DATABASE_ID, table, queries);
-        for (const row of res.rows) {
-          rows.push({ entity: table, row: toRow(row) });
-          const u = (row as unknown as { updatedAt: string }).updatedAt;
-          if (u > maxUpdated) maxUpdated = u;
-          if (u > (after ?? "")) after = u;
+    // Fetch every table concurrently; each pages ascending by updatedAt.
+    const perTable = await Promise.all(
+      TABLES.map(async (table) => {
+        const rows: PullResult["rows"] = [];
+        let after = cursor;
+        let max = cursor ?? "";
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const queries = [Query.orderAsc("updatedAt"), Query.limit(100)];
+          if (after) queries.push(Query.greaterThan("updatedAt", after));
+          const res = await tablesDB!.listRows(DATABASE_ID, table, queries);
+          for (const row of res.rows) {
+            rows.push({ entity: table, row: toRow(row) });
+            const u = (row as unknown as { updatedAt: string }).updatedAt;
+            if (u > max) max = u;
+            if (u > (after ?? "")) after = u;
+          }
+          if (res.rows.length < 100) break;
         }
-        if (res.rows.length < 100) break;
-      }
-    }
+        return { rows, max };
+      })
+    );
+
+    const rows = perTable.flatMap((t) => t.rows);
+    const maxUpdated = perTable.reduce((m, t) => (t.max > m ? t.max : m), cursor ?? "");
     return { rows, cursor: maxUpdated || cursor };
   }
 

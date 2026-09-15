@@ -16,8 +16,11 @@ import { cn } from "@/lib/utils";
 import { StateIcon } from "./icons";
 import { IssueCard } from "./IssueCard";
 import { useBoardIssues, useStates } from "@/hooks/useData";
+import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
 import { createIssue, moveIssue } from "@/store/mutations";
+
+const PAGE = 25; // cards rendered per column before lazy-loading more
 
 function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
   const openIssue = useUI((s) => s.openIssue);
@@ -39,8 +42,23 @@ function DraggableCard({ issue, focused }: { issue: Issue; focused: boolean }) {
 function Column({ state, issues }: { state: State; issues: Issue[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: state.id });
   const focusedId = useUI((s) => s.focusedIssueId);
+  const [visible, setVisible] = React.useState(PAGE);
+
+  // Grow the window as the user nears the bottom (lazy render).
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (
+      el.scrollHeight - el.scrollTop - el.clientHeight < 240 &&
+      visible < issues.length
+    ) {
+      setVisible((v) => Math.min(v + PAGE, issues.length));
+    }
+  };
+
+  const shown = issues.slice(0, visible);
+
   return (
-    <div className="flex w-[300px] shrink-0 flex-col">
+    <div className="flex h-full w-[300px] shrink-0 flex-col">
       <div className="mb-2 flex items-center gap-2 px-1">
         <StateIcon state={state} size={15} />
         <span className="text-[13px] font-medium text-ink">{state.name}</span>
@@ -55,14 +73,20 @@ function Column({ state, issues }: { state: State; issues: Issue[] }) {
       </div>
       <div
         ref={setNodeRef}
+        onScroll={onScroll}
         className={cn(
-          "flex min-h-[120px] flex-1 flex-col gap-2 rounded-lg p-1 transition-colors",
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-lg p-1 transition-colors",
           isOver && "bg-surface-1/50 ring-1 ring-inset ring-brand/30"
         )}
       >
-        {issues.map((issue) => (
+        {shown.map((issue) => (
           <DraggableCard key={issue.id} issue={issue} focused={issue.id === focusedId} />
         ))}
+        {visible < issues.length && (
+          <div className="py-2 text-center text-[11px] text-ink-tertiary">
+            {issues.length - visible} more…
+          </div>
+        )}
       </div>
     </div>
   );
@@ -97,20 +121,22 @@ export function Board() {
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div id="board" className="flex h-full gap-4 overflow-x-auto px-6 py-4">
-        {states.map((s) => (
-          <Column key={s.id} state={s} issues={byState.get(s.id) ?? []} />
-        ))}
-        <div className="w-2 shrink-0" />
-      </div>
-      <DragOverlay dropAnimation={null}>
-        {active ? (
-          <div className="w-[290px] rotate-1">
-            <IssueCard issue={active} />
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+    <LookupProvider>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div id="board" className="flex h-full gap-4 overflow-x-auto px-6 py-4">
+          {states.map((s) => (
+            <Column key={s.id} state={s} issues={byState.get(s.id) ?? []} />
+          ))}
+          <div className="w-2 shrink-0" />
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {active ? (
+            <div className="w-[290px] rotate-1">
+              <IssueCard issue={active} />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </LookupProvider>
   );
 }

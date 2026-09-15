@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { PriorityIcon, StateIcon } from "./icons";
 import { Avatar } from "./ui/primitives";
 import { PriorityPicker, StatePicker } from "./pickers";
-import { useLookups, useSubIssues } from "@/hooks/useData";
+import { useLookupCtx } from "@/hooks/lookups";
 
 interface Props {
   issue: Issue;
@@ -27,8 +27,8 @@ export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueC
   { issue, focused, selected, showState, onOpen, dragHandleProps },
   ref
 ) {
-  const { stateById, memberById, labelById } = useLookups();
-  const subs = useSubIssues(issue.id);
+  const { stateById, memberById, labelById, subCountByParent } = useLookupCtx();
+  const subs = subCountByParent.get(issue.id);
   const assignee = issue.assigneeId ? memberById.get(issue.assigneeId) : undefined;
   const blocked = issue.blockedByIds.length > 0;
 
@@ -79,7 +79,7 @@ export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueC
           </div>
           <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-ink">{issue.title}</p>
 
-          {(issue.labelIds.length > 0 || subs.length > 0 || issue.relatedIds.length > 0) && (
+          {(issue.labelIds.length > 0 || subs || issue.relatedIds.length > 0) && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {issue.labelIds.map((id) => {
                 const l = labelById.get(id);
@@ -94,11 +94,10 @@ export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueC
                   </span>
                 );
               })}
-              {subs.length > 0 && (
+              {subs && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] text-ink-tertiary">
                   <GitBranch className="h-3 w-3" />
-                  {subs.filter((s) => stateById.get(s.stateId)?.type === "completed").length}/
-                  {subs.length}
+                  {subs.done}/{subs.total}
                 </span>
               )}
               {issue.relatedIds.length > 0 && (
