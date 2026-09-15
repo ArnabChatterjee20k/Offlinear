@@ -1,6 +1,10 @@
-import { LayoutGrid, Inbox, Bot, Settings } from "lucide-react";
+import { LayoutGrid, Inbox, Bot, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTeams } from "@/hooks/useData";
+import { Avatar } from "./ui/primitives";
+import { useAuth } from "@/store/auth";
+import { logout } from "@/auth";
+import { appwriteConfigured } from "@/sync/appwrite-config";
 
 function NavItem({
   icon: Icon,
@@ -59,8 +63,31 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto p-2">
-        <NavItem icon={Settings} label="Settings" />
+        <UserChip />
       </div>
     </aside>
+  );
+}
+
+function UserChip() {
+  const { name, email } = useAuth();
+  if (!name && !email) return null;
+  return (
+    <div className="flex items-center gap-2 rounded-md px-2 py-1.5">
+      <Avatar name={name ?? email} size={22} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] text-ink">{name ?? "Me"}</div>
+        {email && <div className="truncate text-[11px] text-ink-tertiary">{email}</div>}
+      </div>
+      {appwriteConfigured && (
+        <button
+          title="Sign out"
+          onClick={() => logout().then(() => window.location.reload())}
+          className="rounded p-1 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
