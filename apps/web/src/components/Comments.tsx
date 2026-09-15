@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Bot, Pencil, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { relTime } from "@/lib/time";
 import { Avatar } from "./ui/primitives";
 import { Button } from "./ui/button";
@@ -8,6 +7,7 @@ import { Textarea } from "./ui/input";
 import { useComments, useLookups } from "@/hooks/useData";
 import { addComment, deleteComment, editComment } from "@/store/mutations";
 import { MOD } from "@/lib/platform";
+import { Markdown } from "./Markdown";
 
 export function Comments({ issueId }: { issueId: string }) {
   const comments = useComments(issueId);
@@ -100,9 +100,7 @@ export function Comments({ issueId }: { issueId: string }) {
                     </div>
                   </div>
                 ) : (
-                  <p className={cn("mt-0.5 whitespace-pre-wrap text-[13px] leading-relaxed text-ink-muted")}>
-                    {c.body}
-                  </p>
+                  <Markdown className="mt-0.5 text-[13px]">{c.body}</Markdown>
                 )}
               </div>
             </div>

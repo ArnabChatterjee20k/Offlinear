@@ -9,6 +9,7 @@ import { AssigneePicker, LabelPicker, PriorityPicker, StatePicker } from "./pick
 import { Comments } from "./Comments";
 import { SubIssues } from "./SubIssues";
 import { Relations } from "./Relations";
+import { Markdown } from "./Markdown";
 import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
 import { updateIssue } from "@/store/mutations";
@@ -37,8 +38,12 @@ function Body({ issue }: { issue: Issue }) {
 
   const [title, setTitle] = React.useState(issue.title);
   const [desc, setDesc] = React.useState(issue.description);
+  const [editingDesc, setEditingDesc] = React.useState(false);
   React.useEffect(() => setTitle(issue.title), [issue.id, issue.title]);
-  React.useEffect(() => setDesc(issue.description), [issue.id, issue.description]);
+  React.useEffect(() => {
+    setDesc(issue.description);
+    setEditingDesc(false);
+  }, [issue.id, issue.description]);
 
   const state = stateById.get(issue.stateId);
   const assignee = issue.assigneeId ? memberById.get(issue.assigneeId) : undefined;
@@ -78,14 +83,34 @@ function Body({ issue }: { issue: Issue }) {
             placeholder="Issue title"
           />
 
-          <textarea
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            onBlur={() => desc !== issue.description && updateIssue(issue.id, { description: desc })}
-            rows={4}
-            className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-ink-muted outline-none placeholder:text-ink-tertiary"
-            placeholder="Add a description…"
-          />
+          {editingDesc ? (
+            <textarea
+              autoFocus
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              onBlur={() => {
+                if (desc !== issue.description) updateIssue(issue.id, { description: desc });
+                setEditingDesc(false);
+              }}
+              rows={6}
+              className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-ink-muted outline-none placeholder:text-ink-tertiary"
+              placeholder="Add a description… (Markdown supported)"
+            />
+          ) : issue.description.trim() ? (
+            <div
+              onClick={() => setEditingDesc(true)}
+              className="-mx-2 cursor-text rounded-md px-2 py-1 hover:bg-surface-1"
+            >
+              <Markdown>{issue.description}</Markdown>
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditingDesc(true)}
+              className="text-[14px] text-ink-tertiary hover:text-ink-subtle"
+            >
+              Add a description…
+            </button>
+          )}
 
           <SubIssues parentId={issue.id} />
           <Relations issue={issue} />
