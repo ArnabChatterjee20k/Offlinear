@@ -20,8 +20,15 @@ export async function currentAccount(): Promise<Models.User<Models.Preferences> 
 
 /** Redirect to GitHub OAuth. On return the browser lands back on the app. */
 export function loginWithGitHub(): void {
-  const url = window.location.origin + window.location.pathname;
-  account?.createOAuth2Session(OAuthProvider.Github, url, url, ["read:user", "user:email"]);
+  const here = window.location.origin + window.location.pathname;
+  // v27 returns the authorize URL (older SDKs redirected for us).
+  const url = account?.createOAuth2Session(
+    OAuthProvider.Github,
+    here,
+    here,
+    ["read:user", "user:email"]
+  );
+  if (typeof url === "string") window.location.href = url;
 }
 
 export async function logout(): Promise<void> {
