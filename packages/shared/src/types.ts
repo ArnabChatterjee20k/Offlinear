@@ -32,6 +32,14 @@ export interface Team extends Synced {
   name: string;
 }
 
+/** A project = one board, optionally linked to a GitHub Projects v2 board. */
+export interface Project extends Synced {
+  name: string;
+  githubProjectId: string | null;
+  githubOwner: string | null;
+  githubTitle: string | null;
+}
+
 export interface State extends Synced {
   teamId: string;
   name: string;
@@ -60,6 +68,7 @@ export type RelationKind = "related" | "blocked_by" | "duplicate_of";
 export interface Issue extends Synced {
   key: string; // "DAT-2519"
   teamId: string;
+  projectId: string | null;
   title: string;
   description: string;
   stateId: string;
@@ -91,6 +100,7 @@ export interface Comment extends Synced {
 
 export type EntityName =
   | "teams"
+  | "projects"
   | "states"
   | "labels"
   | "members"
@@ -99,6 +109,7 @@ export type EntityName =
 
 export interface EntityMap {
   teams: Team;
+  projects: Project;
   states: State;
   labels: Label;
   members: Member;

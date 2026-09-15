@@ -50,6 +50,15 @@ const SERVER: Attr[] = [
 const TABLES: Table[] = [
   { id: "teams", attrs: [{ name: "key", kind: "string", size: 8, required: true }, { name: "name", kind: "string", size: 128, required: true }] },
   {
+    id: "projects",
+    attrs: [
+      { name: "name", kind: "string", size: 128, required: true },
+      { name: "githubProjectId", kind: "string", size: 64 },
+      { name: "githubOwner", kind: "string", size: 100 },
+      { name: "githubTitle", kind: "string", size: 256 },
+    ],
+  },
+  {
     id: "states",
     attrs: [
       { name: "teamId", kind: "string", size: 64 },
@@ -77,6 +86,7 @@ const TABLES: Table[] = [
     attrs: [
       { name: "key", kind: "string", size: 32, required: true },
       { name: "teamId", kind: "string", size: 64 },
+      { name: "projectId", kind: "string", size: 64 },
       { name: "title", kind: "string", size: 512, required: true },
       { name: "description", kind: "string", size: 100000 },
       { name: "stateId", kind: "string", size: 64, required: true },
@@ -99,6 +109,7 @@ const TABLES: Table[] = [
     indexes: [
       { key: "key", attrs: ["key"], type: TablesDBIndexType.Unique },
       { key: "stateId", attrs: ["stateId"] },
+      { key: "projectId", attrs: ["projectId"] },
       { key: "updatedAt", attrs: ["updatedAt"] },
     ],
   },

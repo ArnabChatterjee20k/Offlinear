@@ -4,6 +4,7 @@ import {
   type Comment,
   type Issue,
   type Priority,
+  type Project,
   type RelationKind,
   type State,
   type StateType,
@@ -11,6 +12,7 @@ import {
 import { db } from "@/db/db";
 import { commit } from "@/sync/engine";
 import { batch } from "./history";
+import { useUI } from "./ui";
 import { getActorId, getTeamId } from "./session";
 
 const nowIso = () => new Date().toISOString();
@@ -30,6 +32,49 @@ async function nextBoardOrder(stateId: string): Promise<number> {
   return inCol.reduce((a, b) => Math.max(a, b.boardOrder), 0) + 1;
 }
 
+/** Create a project. Returns its id. */
+export async function createProject(input: {
+  name: string;
+  githubProjectId?: string | null;
+  githubOwner?: string | null;
+  githubTitle?: string | null;
+}): Promise<string> {
+  const id = newOpId();
+  const full: Omit<Project, "createdAt" | "updatedAt" | "rev"> = {
+    id,
+    name: input.name,
+    githubProjectId: input.githubProjectId ?? null,
+    githubOwner: input.githubOwner ?? null,
+    githubTitle: input.githubTitle ?? null,
+  };
+  await commit(
+    makeOp<Project>({
+      entity: "projects",
+      entityId: id,
+      type: "create",
+      patch: full as Partial<Project>,
+      baseRev: 0,
+      actorId: getActorId(),
+    })
+  );
+  return id;
+}
+
+export async function updateProject(id: string, patch: Partial<Project>): Promise<void> {
+  const current = await db.projects.get(id);
+  if (!current) return;
+  await commit(
+    makeOp<Project>({
+      entity: "projects",
+      entityId: id,
+      type: "update",
+      patch,
+      baseRev: current.rev,
+      actorId: getActorId(),
+    })
+  );
+}
+
 /** Create an issue. Returns its id so callers can open it. */
 export async function createIssue(
   input: Partial<Issue> & { title: string }
@@ -40,6 +85,7 @@ export async function createIssue(
     id,
     key: input.key ?? (await nextKey()),
     teamId: input.teamId ?? getTeamId() ?? "",
+    projectId: input.projectId ?? useUI.getState().currentProjectId,
     title: input.title,
     description: input.description ?? "",
     stateId,

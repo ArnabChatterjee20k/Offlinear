@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { db } from "@/db/db";
 
 export type PaletteMode = "root" | "status" | "priority" | "assignee" | "label";
 
@@ -10,6 +11,9 @@ interface Palette {
 }
 
 interface UIState {
+  /** The project whose board is shown. */
+  currentProjectId: string | null;
+  setCurrentProject: (id: string | null) => void;
   /** Issue open in the slide-over panel. */
   openIssueId: string | null;
   /** Keyboard-focused card. */
@@ -18,9 +22,13 @@ interface UIState {
   selection: Set<string>;
   /** Range-select anchor (last card clicked without shift). */
   anchorId: string | null;
+  /** True while Shift is held — reveals card checkboxes. */
+  shiftHeld: boolean;
   palette: Palette;
   helpOpen: boolean;
   githubOpen: boolean;
+  createProjectOpen: boolean;
+  setCreateProject: (open: boolean) => void;
   /** Create-issue modal: closed (null) or open, optionally editing a draft /
    *  pre-filling a state. */
   create: { open: boolean; draftId?: string; stateId?: string } | null;
@@ -31,6 +39,7 @@ interface UIState {
   select: (ids: string[]) => void;
   addSelection: (ids: string[]) => void;
   setAnchor: (id: string | null) => void;
+  setShiftHeld: (v: boolean) => void;
   clearSelection: () => void;
   openPalette: (mode?: PaletteMode, targets?: string[]) => void;
   closePalette: () => void;
@@ -41,13 +50,21 @@ interface UIState {
 }
 
 export const useUI = create<UIState>((set) => ({
+  currentProjectId: null,
+  setCurrentProject: (id) => {
+    set({ currentProjectId: id, openIssueId: null, focusedIssueId: null });
+    void db.meta.put({ key: "currentProject", value: id });
+  },
   openIssueId: null,
   focusedIssueId: null,
   selection: new Set(),
   anchorId: null,
+  shiftHeld: false,
   palette: { open: false, mode: "root", targets: [] },
   helpOpen: false,
   githubOpen: false,
+  createProjectOpen: false,
+  setCreateProject: (open) => set({ createProjectOpen: open }),
   create: null,
 
   openIssue: (id) => set({ openIssueId: id }),
@@ -66,6 +83,7 @@ export const useUI = create<UIState>((set) => ({
       return { selection: next };
     }),
   setAnchor: (id) => set({ anchorId: id }),
+  setShiftHeld: (v) => set({ shiftHeld: v }),
   clearSelection: () => set({ selection: new Set(), anchorId: null }),
   openPalette: (mode = "root", targets = []) =>
     set({ palette: { open: true, mode, targets } }),

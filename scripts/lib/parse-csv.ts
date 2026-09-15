@@ -10,12 +10,14 @@ import {
   type Issue,
   type Label,
   type Member,
+  type Project,
   type State,
   type Team,
 } from "@offlinear/shared";
 
 export interface Dataset {
   teams: Team[];
+  projects: Project[];
   states: State[];
   labels: Label[];
   members: Member[];
@@ -23,6 +25,8 @@ export interface Dataset {
   comments: Comment[];
   generatedAt: string;
 }
+
+const IMPORT_PROJECT_ID = "project_imported";
 
 const slug = (s: string) =>
   s
@@ -140,6 +144,7 @@ export function mapDataset(csv: string): Dataset {
       id: key,
       key,
       teamId: tId,
+      projectId: IMPORT_PROJECT_ID,
       title: r["Title"] || "(untitled)",
       description: r["Description"] || "",
       stateId: sId,
@@ -179,8 +184,20 @@ export function mapDataset(csv: string): Dataset {
     issue.duplicateOfId = keys(r["Duplicate of"]).find((k) => exists.has(k)) ?? null;
   }
 
+  const projects: Project[] = [
+    {
+      ...base,
+      id: IMPORT_PROJECT_ID,
+      name: "Imported",
+      githubProjectId: null,
+      githubOwner: null,
+      githubTitle: null,
+    },
+  ];
+
   return {
     teams: [...teams.values()],
+    projects,
     states,
     labels: [...labels.values()],
     members: [...members.values()],

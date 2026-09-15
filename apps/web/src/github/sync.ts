@@ -1,6 +1,7 @@
 import type { Issue } from "@offlinear/shared";
 import { db } from "@/db/db";
-import { createIssue, createState } from "@/store/mutations";
+import { createIssue, createState, updateProject } from "@/store/mutations";
+import { useUI } from "@/store/ui";
 import { DATABASE_ID, appwriteConfigured, tablesDB } from "@/sync/appwrite-config";
 import {
   addDraftIssue,
@@ -11,44 +12,43 @@ import {
   type GhProject,
 } from "./client";
 
-const PROJECT_KEY = "github.project";
-
+/** The GitHub board linked to the *current* project, if any. */
 export async function getSelectedProject(): Promise<GhProject | null> {
-  return ((await db.meta.get(PROJECT_KEY))?.value as GhProject | undefined) ?? null;
+  const pid = useUI.getState().currentProjectId;
+  if (!pid) return null;
+  const proj = await db.projects.get(pid);
+  if (!proj?.githubProjectId) return null;
+  return {
+    id: proj.githubProjectId,
+    title: proj.githubTitle ?? "",
+    number: 0,
+    owner: proj.githubOwner ?? "",
+  };
 }
 
-/** Merge-write the settings.app row (partial), creating it if missing. */
-async function updateSettings(patch: Record<string, unknown>): Promise<void> {
-  if (!appwriteConfigured || !tablesDB) return;
-  const now = new Date().toISOString();
-  try {
-    await tablesDB.updateRow(DATABASE_ID, "settings", "app", { ...patch, updatedAt: now });
-  } catch (e) {
-    if ((e as { code?: number }).code === 404) {
-      await tablesDB.upsertRow(DATABASE_ID, "settings", "app", {
-        ...patch,
-        rev: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-    /* else: settings unavailable; local choice still applies */
-  }
-}
-
+/** Link (or unlink) a GitHub board to the current project. */
 export async function setSelectedProject(p: GhProject | null): Promise<void> {
-  await db.meta.put({ key: PROJECT_KEY, value: p });
-  // Persist to Appwrite so the cloud auto-syncer targets the chosen board.
-  await updateSettings({
+  const pid = useUI.getState().currentProjectId;
+  if (!pid) return;
+  await updateProject(pid, {
     githubProjectId: p?.id ?? null,
     githubOwner: p?.owner ?? null,
     githubTitle: p?.title ?? null,
   });
 }
 
-/** Store a GitHub token the cloud auto-syncer will use (instead of the env var). */
+/** Store a GitHub token the cloud auto-syncer will use (settings.app, global). */
 export async function saveGithubToken(token: string): Promise<void> {
-  await updateSettings({ githubToken: token.trim() || null });
+  if (!appwriteConfigured || !tablesDB) return;
+  const now = new Date().toISOString();
+  const data = { githubToken: token.trim() || null, updatedAt: now };
+  try {
+    await tablesDB.updateRow(DATABASE_ID, "settings", "app", data);
+  } catch (e) {
+    if ((e as { code?: number }).code === 404) {
+      await tablesDB.upsertRow(DATABASE_ID, "settings", "app", { ...data, rev: 1, createdAt: now });
+    }
+  }
 }
 
 export interface Diff {
@@ -62,8 +62,11 @@ const norm = (s: string) => s.trim().toLowerCase();
 /** Compare local top-level issues to the project's items (by stored mapping,
  *  falling back to exact title match). */
 export async function computeDiff(projectId: string): Promise<Diff> {
+  const pid = useUI.getState().currentProjectId;
   const [issues, items, maps] = await Promise.all([
-    db.issues.filter((i) => !i.parentId && !i.archivedAt).toArray(),
+    db.issues
+      .filter((i) => !i.parentId && !i.archivedAt && i.projectId === pid)
+      .toArray(),
     getProjectItems(projectId),
     db.ghmap.toArray(),
   ]);

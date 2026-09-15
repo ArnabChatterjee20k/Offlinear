@@ -1,6 +1,6 @@
-import { LayoutGrid, Inbox, Bot, LogOut, Keyboard, FileText, Trash2 } from "lucide-react";
+import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTeams, useDrafts } from "@/hooks/useData";
+import { useProjects, useDrafts } from "@/hooks/useData";
 import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
 import { useUI } from "@/store/ui";
@@ -31,7 +31,6 @@ function NavItem({
 }
 
 export function Sidebar() {
-  const teams = useTeams();
   return (
     <aside className="flex w-[240px] shrink-0 flex-col border-r border-hairline bg-canvas">
       <div className="flex h-12 items-center gap-2 border-b border-hairline px-4">
@@ -41,37 +40,66 @@ export function Sidebar() {
         <span className="text-[14px] font-semibold tracking-tight text-ink">Offlinear</span>
       </div>
 
-      <nav className="space-y-0.5 p-2">
-        <NavItem icon={Inbox} label="Inbox" />
-        <NavItem icon={LayoutGrid} label="Board" active />
-        <NavItem icon={Bot} label="Agents" />
-      </nav>
-
-      <Drafts />
-
-
-      <div className="mt-2 px-3 py-1 text-[11px] uppercase tracking-wider text-ink-tertiary">
-        Teams
+      <div className="flex-1 overflow-y-auto p-2">
+        <nav className="space-y-0.5">
+          <NavItem icon={Bot} label="Agents" />
+        </nav>
+        <Projects />
+        <Drafts />
       </div>
-      <nav className="space-y-0.5 px-2">
-        {teams.map((t) => (
-          <button
-            key={t.id}
-            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] text-ink-subtle hover:bg-surface-1 hover:text-ink"
-          >
-            <span className="grid h-4 w-4 place-items-center rounded bg-surface-3 font-mono text-[9px] text-ink-subtle">
-              {t.key}
-            </span>
-            {t.name}
-          </button>
-        ))}
-      </nav>
 
-      <div className="mt-auto p-2">
+      <div className="p-2">
         <ShortcutsButton />
         <UserChip />
       </div>
     </aside>
+  );
+}
+
+function Projects() {
+  const projects = useProjects();
+  const currentId = useUI((s) => s.currentProjectId);
+  const setCurrentProject = useUI((s) => s.setCurrentProject);
+  const setCreateProject = useUI((s) => s.setCreateProject);
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between px-2 py-1">
+        <span className="text-[11px] uppercase tracking-wider text-ink-tertiary">Projects</span>
+        <button
+          onClick={() => setCreateProject(true)}
+          title="New project"
+          className="rounded p-0.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <nav className="space-y-0.5">
+        {projects.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setCurrentProject(p.id)}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+              p.id === currentId
+                ? "bg-surface-2 text-ink"
+                : "text-ink-subtle hover:bg-surface-1 hover:text-ink"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4 shrink-0" />
+            <span className="truncate">{p.name}</span>
+            {p.githubProjectId && <Github className="ml-auto h-3 w-3 shrink-0 text-ink-tertiary" />}
+          </button>
+        ))}
+        {projects.length === 0 && (
+          <button
+            onClick={() => setCreateProject(true)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-ink-subtle hover:bg-surface-1 hover:text-ink"
+          >
+            <Plus className="h-4 w-4" /> New project
+          </button>
+        )}
+      </nav>
+    </div>
   );
 }
 

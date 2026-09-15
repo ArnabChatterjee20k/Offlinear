@@ -46,6 +46,7 @@ async function main() {
 
   console.log(`Importing into "${DB}"…`);
   await upsert("teams", data.teams);
+  await upsert("projects", data.projects);
   await upsert("states", data.states);
   await upsert("labels", data.labels);
   await upsert("members", data.members);

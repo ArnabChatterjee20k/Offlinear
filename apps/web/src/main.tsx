@@ -12,7 +12,19 @@ import { currentAccount, ensureMember } from "./auth";
 import { setSession } from "./store/session";
 import { useAuth } from "./store/auth";
 import { useUI } from "./store/ui";
-import { getSelectedProject } from "./github/sync";
+
+/** Pick the project to show on load: the last one, else the first, else prompt
+ *  to create one (first-run onboarding). */
+async function selectStartupProject() {
+  const projects = await db.projects.orderBy("name").toArray();
+  if (projects.length === 0) {
+    useUI.getState().setCreateProject(true);
+    return;
+  }
+  const last = (await db.meta.get("currentProject"))?.value as string | undefined;
+  const chosen = projects.find((p) => p.id === last) ?? projects[0];
+  useUI.setState({ currentProjectId: chosen.id });
+}
 
 async function bootstrap() {
   const root = ReactDOM.createRoot(document.getElementById("root")!);
@@ -36,10 +48,7 @@ async function bootstrap() {
     const team = (await db.teams.toArray())[0] ?? null;
     setSession({ actorId: memberId, teamId: team?.id ?? null });
     initSync();
-
-    // First run: no board connected yet → open the GitHub connect step
-    // (choose gh CLI or OAuth, then pick a board).
-    if (!(await getSelectedProject())) useUI.getState().setGithub(true);
+    await selectStartupProject();
 
     render(<App />);
     return;
@@ -56,6 +65,7 @@ async function bootstrap() {
   if (me) useAuth.getState().set({ memberId: me.id, name: me.name, email: me.email });
   setSession({ actorId: me?.id ?? null, teamId: team?.id ?? null });
   initSync();
+  await selectStartupProject();
   render(<App />);
 }
 

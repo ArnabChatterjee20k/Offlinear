@@ -6,6 +6,7 @@ import type {
   Member,
   Op,
   Priority,
+  Project,
   State,
   Team,
 } from "@offlinear/shared";
@@ -47,6 +48,7 @@ export interface Meta {
 // The local mirror of Appwrite TablesDB + the outbox and meta stores.
 export class OfflinearDB extends Dexie {
   teams!: EntityTable<Team, "id">;
+  projects!: EntityTable<Project, "id">;
   states!: EntityTable<State, "id">;
   labels!: EntityTable<Label, "id">;
   members!: EntityTable<Member, "id">;
@@ -71,6 +73,10 @@ export class OfflinearDB extends Dexie {
     });
     this.version(2).stores({ drafts: "id, updatedAt" });
     this.version(3).stores({ ghmap: "issueId, itemId" });
+    this.version(4).stores({
+      projects: "id, name",
+      issues: "id, key, stateId, projectId, assigneeId, parentId, updatedAt, boardOrder",
+    });
   }
 }
 

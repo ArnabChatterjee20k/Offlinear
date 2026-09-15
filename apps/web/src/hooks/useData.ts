@@ -1,6 +1,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Issue } from "@offlinear/shared";
 import { db } from "@/db/db";
+import { useUI } from "@/store/ui";
 
 export const useStates = () =>
   useLiveQuery(() => db.states.orderBy("position").toArray(), [], []);
@@ -8,14 +9,21 @@ export const useStates = () =>
 export const useMembers = () => useLiveQuery(() => db.members.toArray(), [], []);
 export const useLabels = () => useLiveQuery(() => db.labels.toArray(), [], []);
 export const useTeams = () => useLiveQuery(() => db.teams.toArray(), [], []);
+export const useProjects = () =>
+  useLiveQuery(() => db.projects.orderBy("name").toArray(), [], []);
 
-/** Top-level issues (no parent), ordered for the board. */
-export const useBoardIssues = () =>
-  useLiveQuery(
-    () => db.issues.filter((i) => !i.parentId && !i.archivedAt).toArray(),
-    [],
+/** Top-level issues (no parent) for the current project, ordered for the board. */
+export const useBoardIssues = () => {
+  const projectId = useUI((s) => s.currentProjectId);
+  return useLiveQuery(
+    () =>
+      db.issues
+        .filter((i) => !i.parentId && !i.archivedAt && i.projectId === projectId)
+        .toArray(),
+    [projectId],
     [] as Issue[]
   );
+};
 
 export const useIssue = (id: string | null) =>
   useLiveQuery(() => (id ? db.issues.get(id) : undefined), [id]);
