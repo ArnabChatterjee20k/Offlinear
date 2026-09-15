@@ -1,11 +1,11 @@
-// Push the Linear CSV export into Appwrite TablesDB (Databases API). Idempotent
-// upserts keyed by our deterministic ids. Runs from Phase 3.5 onward.
+// Push the Linear CSV export into Appwrite TablesDB. Idempotent upserts keyed
+// by our deterministic ids. Runs from Phase 3.5 onward.
 //   pnpm run import -- "path/to/export.csv"
 import { config } from "dotenv";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client, Databases } from "node-appwrite";
+import { Client, TablesDB } from "node-appwrite";
 import { mapDataset, type Dataset } from "./lib/parse-csv.js";
 
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
@@ -26,28 +26,22 @@ const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID)
   .setKey(APPWRITE_API_KEY);
-const db = new Databases(client);
+const tdb = new TablesDB(client);
 const DB = APPWRITE_DATABASE_ID;
 
-async function upsert(collection: string, rows: { id: string }[]) {
+async function upsert(table: string, rows: { id: string }[]) {
   let ok = 0;
   for (const row of rows) {
     const { id, ...data } = row;
-    try {
-      await db.createDocument(DB, collection, id, data);
-    } catch (e: any) {
-      if (e?.code === 409) await db.updateDocument(DB, collection, id, data);
-      else throw e;
-    }
+    await tdb.upsertRow(DB, table, id, data);
     ok++;
   }
-  console.log(`  ${collection}: ${ok}`);
+  console.log(`  ${table}: ${ok}`);
 }
 
 async function main() {
-  const input =
-    process.argv[2] ??
-    resolve(process.cwd(), "arnab@appwrite.io › Assigned issues.csv");
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const input = process.argv[2] ?? resolve(root, "arnab@appwrite.io › Assigned issues.csv");
   const data: Dataset = mapDataset(readFileSync(input, "utf8"));
 
   console.log(`Importing into "${DB}"…`);

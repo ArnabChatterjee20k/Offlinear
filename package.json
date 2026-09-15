@@ -10,7 +10,7 @@
     "typecheck": "pnpm -r typecheck",
     "seed": "pnpm --filter @offlinear/scripts seed",
     "schema:push": "pnpm --filter @offlinear/scripts schema:push",
-    "import": "pnpm --filter @offlinear/scripts import"
+    "import": "pnpm --filter @offlinear/scripts run import"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

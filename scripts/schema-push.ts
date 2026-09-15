@@ -1,12 +1,10 @@
-// Schema-as-code for Appwrite TablesDB (exposed as the Databases API in
-// node-appwrite v14). Idempotently creates the database, collections, columns,
-// and indexes. Runs from Phase 3.5 onward; needs .env credentials.
-//
+// Schema-as-code for Appwrite TablesDB. Idempotently creates the database,
+// tables, columns, and indexes. Runs from Phase 3.5 onward; needs .env creds.
 //   pnpm run schema:push
 import { config } from "dotenv";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client, Databases, IndexType, Permission, Role } from "node-appwrite";
+import { Client, TablesDB, TablesDBIndexType, Permission, Role } from "node-appwrite";
 
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
 
@@ -26,7 +24,7 @@ const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID)
   .setKey(APPWRITE_API_KEY);
-const db = new Databases(client);
+const tdb = new TablesDB(client);
 const DB = APPWRITE_DATABASE_ID;
 
 type Attr =
@@ -36,20 +34,20 @@ type Attr =
   | { name: string; kind: "datetime"; required?: boolean }
   | { name: string; kind: "enum"; elements: string[]; required?: boolean };
 
-interface Collection {
+interface Table {
   id: string;
   attrs: Attr[];
-  indexes?: { key: string; attrs: string[]; type?: IndexType }[];
+  indexes?: { key: string; attrs: string[]; type?: TablesDBIndexType }[];
 }
 
-// Server fields (rev/createdAt/updatedAt) are appended to every collection.
+// Server columns (rev/createdAt/updatedAt) are appended to every table.
 const SERVER: Attr[] = [
   { name: "rev", kind: "int", required: true },
   { name: "createdAt", kind: "datetime", required: true },
   { name: "updatedAt", kind: "datetime", required: true },
 ];
 
-const COLLECTIONS: Collection[] = [
+const TABLES: Table[] = [
   { id: "teams", attrs: [{ name: "key", kind: "string", size: 8, required: true }, { name: "name", kind: "string", size: 128, required: true }] },
   {
     id: "states",
@@ -99,7 +97,7 @@ const COLLECTIONS: Collection[] = [
       { name: "archivedAt", kind: "datetime" },
     ],
     indexes: [
-      { key: "key", attrs: ["key"], type: IndexType.Unique },
+      { key: "key", attrs: ["key"], type: TablesDBIndexType.Unique },
       { key: "stateId", attrs: ["stateId"] },
       { key: "updatedAt", attrs: ["updatedAt"] },
     ],
@@ -126,47 +124,47 @@ const ignore409 = async (p: Promise<unknown>, label: string) => {
   }
 };
 
-async function createAttr(col: string, a: Attr) {
+async function createColumn(table: string, a: Attr) {
   const req = "required" in a ? !!a.required : false;
   const arr = "array" in a ? !!a.array : false;
   switch (a.kind) {
     case "string":
-      return db.createStringAttribute(DB, col, a.name, a.size, req, undefined, arr);
+      return tdb.createStringColumn(DB, table, a.name, a.size, req, undefined, arr);
     case "int":
-      return db.createIntegerAttribute(DB, col, a.name, req, undefined, undefined, undefined, arr);
+      return tdb.createIntegerColumn(DB, table, a.name, req, undefined, undefined, undefined, arr);
     case "float":
-      return db.createFloatAttribute(DB, col, a.name, req, undefined, undefined, undefined, arr);
+      return tdb.createFloatColumn(DB, table, a.name, req, undefined, undefined, undefined, arr);
     case "bool":
-      return db.createBooleanAttribute(DB, col, a.name, req, undefined, arr);
+      return tdb.createBooleanColumn(DB, table, a.name, req, undefined, arr);
     case "datetime":
-      return db.createDatetimeAttribute(DB, col, a.name, req, undefined, arr);
+      return tdb.createDatetimeColumn(DB, table, a.name, req, undefined, arr);
     case "enum":
-      return db.createEnumAttribute(DB, col, a.name, a.elements, req, undefined, arr);
+      return tdb.createEnumColumn(DB, table, a.name, a.elements, req, undefined, arr);
   }
 }
 
 async function main() {
   console.log(`Pushing schema to database "${DB}"…`);
-  await ignore409(db.create(DB, "Offlinear"), `database ${DB}`);
+  await ignore409(tdb.create(DB, "Offlinear"), `database ${DB}`);
 
-  for (const col of COLLECTIONS) {
+  for (const table of TABLES) {
     await ignore409(
-      db.createCollection(DB, col.id, col.id, [
+      tdb.createTable(DB, table.id, table.id, [
         Permission.read(Role.users()),
         Permission.create(Role.users()),
         Permission.update(Role.users()),
         Permission.delete(Role.users()),
       ]),
-      `collection ${col.id}`
+      `table ${table.id}`
     );
-    for (const a of [...col.attrs, ...SERVER]) {
-      await ignore409(createAttr(col.id, a), `${col.id}.${a.name}`);
+    for (const a of [...table.attrs, ...SERVER]) {
+      await ignore409(createColumn(table.id, a), `${table.id}.${a.name}`);
     }
-    // Attributes must be available before indexes; Appwrite processes async.
-    for (const idx of col.indexes ?? []) {
+    // Columns must be available before indexes; Appwrite processes async.
+    for (const idx of table.indexes ?? []) {
       await ignore409(
-        db.createIndex(DB, col.id, idx.key, idx.type ?? IndexType.Key, idx.attrs),
-        `${col.id} idx ${idx.key}`
+        tdb.createIndex(DB, table.id, idx.key, idx.type ?? TablesDBIndexType.Key, idx.attrs),
+        `${table.id} idx ${idx.key}`
       );
     }
   }

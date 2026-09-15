@@ -1,5 +1,5 @@
 import { OAuthProvider, type Models } from "appwrite";
-import { DATABASE_ID, account, databases } from "./sync/appwrite-config";
+import { DATABASE_ID, account, tablesDB } from "./sync/appwrite-config";
 
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 30);
@@ -51,16 +51,7 @@ export async function ensureMember(
     createdAt: now,
     updatedAt: now,
   };
-  try {
-    await databases!.createDocument(DATABASE_ID, "members", id, data);
-  } catch (e) {
-    if ((e as { code?: number }).code === 409) {
-      await databases!.updateDocument(DATABASE_ID, "members", id, {
-        name: data.name,
-        email: data.email,
-        updatedAt: now,
-      });
-    } else throw e;
-  }
+  // upsertRow creates or replaces — idempotent for repeat logins.
+  await tablesDB!.upsertRow(DATABASE_ID, "members", id, data);
   return id;
 }

@@ -1,8 +1,8 @@
-import { Account, Client, Databases } from "appwrite";
+import { Account, Client, TablesDB } from "appwrite";
 
-// Read from Vite env (apps/web/.env). The API key is NEVER used in the browser;
-// the client authenticates with an (anonymous) session and relies on collection
-// permissions (Role.users()).
+// Read from Vite env (apps/web/.env). No API key in the browser; the client
+// authenticates with a GitHub OAuth session and relies on table permissions
+// (Role.users()).
 const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT as string | undefined;
 const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID as string | undefined;
 export const DATABASE_ID =
@@ -15,5 +15,5 @@ export const client = appwriteConfigured
   ? new Client().setEndpoint(endpoint!).setProject(projectId!)
   : null;
 
-export const databases = client ? new Databases(client) : null;
+export const tablesDB = client ? new TablesDB(client) : null;
 export const account = client ? new Account(client) : null;
