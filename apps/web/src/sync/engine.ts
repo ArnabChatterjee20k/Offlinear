@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { db, type OutboxEntry } from "@/db/db";
 import type { PullResult, SyncAdapter } from "./adapter";
 import { LocalAdapter } from "./local-adapter";
+import { pushChange } from "@/store/history";
 
 // The tables an op can target, resolved by name.
 const tableFor = (entity: EntityName) => db[entity] as unknown as {
@@ -41,12 +42,26 @@ export function setAdapter(a: SyncAdapter) {
 /**
  * The single write path. Applies an op optimistically to the local mirror, then
  * enqueues it for the adapter. The UI re-renders from Dexie immediately — the
- * network never blocks a keystroke.
+ * network never blocks a keystroke. Records an undo entry unless record:false
+ * (used by undo/redo itself).
  */
-export async function commit(op: Op): Promise<void> {
+export async function commit(op: Op, opts: { record?: boolean } = {}): Promise<void> {
   const table = tableFor(op.entity);
   const current = await table.get(op.entityId);
+  const before = current ? ({ ...current } as Synced) : null;
   const { next } = applyOp(current as Synced | undefined, op as Op<Partial<Synced>>);
+
+  // Carry the server-managed fields into the pushed patch so the adapter writes
+  // a complete, schema-valid row: createdAt/updatedAt/rev on create, and an
+  // advanced updatedAt/rev on update (so delta pulls and LWW see the change).
+  if (next) {
+    op.patch = {
+      ...op.patch,
+      updatedAt: next.updatedAt,
+      rev: next.rev,
+      ...(op.type === "create" ? { createdAt: next.createdAt } : {}),
+    };
+  }
 
   await db.transaction("rw", [db[op.entity] as never, db.outbox], async () => {
     if (next) await table.put(next);
@@ -59,6 +74,10 @@ export async function commit(op: Op): Promise<void> {
       attempts: 0,
     });
   });
+
+  if (opts.record !== false) {
+    pushChange({ entity: op.entity, id: op.entityId, before, after: next ? ({ ...next } as Synced) : null });
+  }
 
   await useSync.getState().refresh();
   void drain();
