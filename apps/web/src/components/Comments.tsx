@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/input";
 import { useComments, useLookups } from "@/hooks/useData";
 import { addComment, deleteComment, editComment } from "@/store/mutations";
+import { MOD } from "@/lib/platform";
 
 export function Comments({ issueId }: { issueId: string }) {
   const comments = useComments(issueId);
@@ -120,7 +121,7 @@ export function Comments({ issueId }: { issueId: string }) {
           }}
         />
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-ink-tertiary">⌘↵ to comment</span>
+          <span className="text-[11px] text-ink-tertiary">{MOD}↵ to comment</span>
           <Button size="sm" variant="primary" disabled={!draft.trim()} onClick={submit}>
             Comment
           </Button>

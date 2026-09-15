@@ -5,6 +5,7 @@ import { Kbd } from "./ui/primitives";
 import { useSync } from "@/sync/engine";
 import { useUI } from "@/store/ui";
 import { createIssue } from "@/store/mutations";
+import { MOD } from "@/lib/platform";
 
 function SyncDot() {
   const { online, pending, syncing } = useSync();
@@ -38,7 +39,7 @@ export function TopBar() {
         >
           <Command className="h-3.5 w-3.5" />
           Search…
-          <Kbd>⌘K</Kbd>
+          <Kbd>{MOD}K</Kbd>
         </button>
         <Button variant="primary" size="sm" onClick={() => createIssue({ title: "New issue" })}>
           <Plus className="h-3.5 w-3.5" />
