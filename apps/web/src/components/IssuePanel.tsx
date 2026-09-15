@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogClose, DialogTitle, SheetContent } from "./ui/dialog";
 import { X, ChevronUp } from "lucide-react";
 import { PRIORITY_LABELS, type Issue } from "@offlinear/shared";
@@ -12,13 +13,22 @@ import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
 import { updateIssue } from "@/store/mutations";
 
-function PropButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button className="flex items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2 py-1 text-[12px] text-ink-muted hover:border-hairline-strong hover:text-ink">
-      {children}
-    </button>
-  );
-}
+const PropButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ children, className, ...props }, ref) => (
+  <button
+    ref={ref}
+    className={cn(
+      "flex items-center gap-1.5 rounded-md border border-hairline bg-surface-1 px-2 py-1 text-[12px] text-ink-muted hover:border-hairline-strong hover:text-ink",
+      className
+    )}
+    {...props}
+  >
+    {children}
+  </button>
+));
+PropButton.displayName = "PropButton";
 
 function Body({ issue }: { issue: Issue }) {
   const { stateById, memberById, labelById } = useLookups();
