@@ -1,7 +1,7 @@
 import { applyOp, type EntityName, type Op, type Synced } from "@offlinear/shared";
 import { create } from "zustand";
 import { db, type OutboxEntry } from "@/db/db";
-import type { SyncAdapter } from "./adapter";
+import type { PullResult, SyncAdapter } from "./adapter";
 import { LocalAdapter } from "./local-adapter";
 
 // The tables an op can target, resolved by name.
@@ -111,9 +111,65 @@ async function processEntry(entry: OutboxEntry): Promise<void> {
   }
 }
 
+// --- Pull path (authoritative state coming down) ---------------------------
+
+/**
+ * Apply rows fetched/streamed from the adapter into the local mirror. Uses
+ * last-write-wins by `updatedAt`, and never clobbers a row that still has a
+ * pending local op (that edit hasn't been acknowledged yet).
+ */
+export async function applyRemote(result: PullResult): Promise<void> {
+  if (result.rows.length === 0) return;
+  const pendingIds = new Set(
+    (await db.outbox.where("status").anyOf("pending", "syncing", "failed").toArray()).map(
+      (e) => e.op.entityId
+    )
+  );
+
+  await db.transaction(
+    "rw",
+    [db.teams, db.states, db.labels, db.members, db.issues, db.comments],
+    async () => {
+      for (const { entity, row, deleted } of result.rows) {
+        const id = row.id as string;
+        if (pendingIds.has(id)) continue; // local edit wins until it syncs
+        const table = tableFor(entity);
+        if (deleted) {
+          await table.delete(id);
+          continue;
+        }
+        const local = await table.get(id);
+        const incoming = row as unknown as Synced;
+        if (!local || incoming.updatedAt >= local.updatedAt) {
+          await table.put(incoming);
+        }
+      }
+    }
+  );
+
+  if (result.cursor) await db.meta.put({ key: "syncCursor", value: result.cursor });
+}
+
+/** One delta pull since the stored cursor. */
+export async function pullOnce(): Promise<void> {
+  const cursor = ((await db.meta.get("syncCursor"))?.value as string | undefined) ?? null;
+  const res = await adapter.pullSince(cursor);
+  await applyRemote(res);
+}
+
+let unsubscribe: (() => void) | null = null;
+
 /** Wire browser online/offline into the engine. Call once at startup. */
 export function initSync(): void {
-  window.addEventListener("online", () => useSync.getState().setOnline(true));
+  window.addEventListener("online", () => {
+    useSync.getState().setOnline(true);
+    void pullOnce();
+  });
   window.addEventListener("offline", () => useSync.getState().setOnline(false));
+
+  // Live updates from the source of truth (no-op for LocalAdapter).
+  if (adapter.subscribe && !unsubscribe) {
+    unsubscribe = adapter.subscribe((r) => void applyRemote(r));
+  }
   void drain();
 }

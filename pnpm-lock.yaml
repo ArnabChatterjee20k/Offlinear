@@ -44,6 +44,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.6
         version: 1.2.16(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      appwrite:
+        specifier: ^16.1.0
+        version: 16.1.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1100,6 +1103,9 @@ packages:
   anymatch@3.1.3:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
+
+  appwrite@16.1.0:
+    resolution: {integrity: sha512-fFkhpOjxvobKKWdgvG3fcsYt93QEk0VJ86q7ALD53eWAFiFmpklNXeE4rpXqdmtWpin4VuyWhkmH1aOF/QxvsA==}
 
   arg@5.0.2:
     resolution: {integrity: sha512-PYjyFOLKQ9y57JvQ6QLo8dAgNqswh8M1RMJYdQduT6xbWSgK36P/Z/v+p888pM69jMMfS8Xd8F6I1kQ/I9HUGg==}
@@ -2469,6 +2475,8 @@ snapshots:
     dependencies:
       normalize-path: 3.0.0
       picomatch: 2.3.2
+
+  appwrite@16.1.0: {}
 
   arg@5.0.2: {}
 

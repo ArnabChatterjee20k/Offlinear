@@ -5,7 +5,7 @@ export type PushResult =
   | { ok: false; conflict: "base-rev-mismatch" | "missing"; server?: unknown };
 
 export interface PullResult {
-  rows: { entity: EntityName; row: Record<string, unknown> }[];
+  rows: { entity: EntityName; row: Record<string, unknown>; deleted?: boolean }[];
   cursor: string | null;
 }
 

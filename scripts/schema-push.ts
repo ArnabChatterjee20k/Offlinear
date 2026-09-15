@@ -3,8 +3,12 @@
 // and indexes. Runs from Phase 3.5 onward; needs .env credentials.
 //
 //   pnpm run schema:push
-import "dotenv/config";
+import { config } from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client, Databases, IndexType, Permission, Role } from "node-appwrite";
+
+config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
 
 const {
   APPWRITE_ENDPOINT,

@@ -1,11 +1,14 @@
 // Push the Linear CSV export into Appwrite TablesDB (Databases API). Idempotent
 // upserts keyed by our deterministic ids. Runs from Phase 3.5 onward.
 //   pnpm run import -- "path/to/export.csv"
-import "dotenv/config";
+import { config } from "dotenv";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client, Databases } from "node-appwrite";
 import { mapDataset, type Dataset } from "./lib/parse-csv.js";
+
+config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
 
 const {
   APPWRITE_ENDPOINT,
