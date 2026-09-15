@@ -122,7 +122,24 @@ export function useKeyboard() {
       }
     }
 
+    // Track Shift held to reveal card checkboxes.
+    const onShiftDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") ui.getState().setShiftHeld(true);
+    };
+    const onShiftUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") ui.getState().setShiftHeld(false);
+    };
+    const onBlur = () => ui.getState().setShiftHeld(false);
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onShiftDown);
+    window.addEventListener("keyup", onShiftUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onShiftDown);
+      window.removeEventListener("keyup", onShiftUp);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [ui]);
 }

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GitBranch, Link2, Ban } from "lucide-react";
+import { GitBranch, Link2, Ban, Check } from "lucide-react";
 import type { Issue } from "@offlinear/shared";
 import { cn } from "@/lib/utils";
 import { PriorityIcon, StateIcon } from "./icons";
@@ -12,6 +12,9 @@ interface Props {
   focused?: boolean;
   selected?: boolean;
   showState?: boolean;
+  /** Show the selection checkbox (Shift held, or a selection is active). */
+  selectable?: boolean;
+  onToggleSelect?: (id: string) => void;
   onClick?: (e: React.MouseEvent) => void;
   dragHandleProps?: Record<string, unknown>;
 }
@@ -24,7 +27,7 @@ const Stop = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueCard(
-  { issue, focused, selected, showState, onClick, dragHandleProps },
+  { issue, focused, selected, showState, selectable, onToggleSelect, onClick, dragHandleProps },
   ref
 ) {
   const { stateById, memberById, labelById, subCountByParent } = useLookupCtx();
@@ -46,6 +49,19 @@ export const IssueCard = React.forwardRef<HTMLDivElement, Props>(function IssueC
       {...dragHandleProps}
     >
       <div className="flex items-start gap-2">
+        {selectable && (
+          <span onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => onToggleSelect?.(issue.id)}
+              className={cn(
+                "mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors",
+                selected ? "border-brand bg-brand text-white" : "border-hairline-strong hover:border-ink-subtle"
+              )}
+            >
+              {selected && <Check className="h-3 w-3" />}
+            </button>
+          </span>
+        )}
         <Stop>
           <PriorityPicker
             issue={issue}
