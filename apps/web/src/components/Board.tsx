@@ -98,7 +98,7 @@ export function Board() {
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="flex h-full gap-4 overflow-x-auto px-6 py-4">
+      <div id="board" className="flex h-full gap-4 overflow-x-auto px-6 py-4">
         {states.map((s) => (
           <Column key={s.id} state={s} issues={byState.get(s.id) ?? []} />
         ))}
