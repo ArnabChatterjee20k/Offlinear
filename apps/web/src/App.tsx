@@ -8,6 +8,7 @@ import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { CreateIssueModal } from "./components/CreateIssueModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { GitHubDialog } from "./components/GitHubDialog";
+import { MergeModal } from "./components/Notifications";
 import { useKeyboard } from "./hooks/useKeyboard";
 import { useRoute } from "./store/route";
 
@@ -36,6 +37,7 @@ export function App() {
       <CreateIssueModal />
       <CreateProjectModal />
       <GitHubDialog />
+      <MergeModal />
     </div>
   );
 }

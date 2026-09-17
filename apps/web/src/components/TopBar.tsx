@@ -5,6 +5,7 @@ import { Kbd } from "./ui/primitives";
 import { useSync } from "@/sync/engine";
 import { useUI } from "@/store/ui";
 import { MOD } from "@/lib/platform";
+import { NotificationBell } from "./Notifications";
 
 function SyncDot() {
   const { online, pending, syncing } = useSync();
@@ -34,6 +35,7 @@ export function TopBar() {
       <h2 className="text-[14px] font-medium text-ink">Board</h2>
       <SyncDot />
       <div className="ml-auto flex items-center gap-2">
+        <NotificationBell />
         <button
           onClick={() => openPalette()}
           className="flex items-center gap-2 rounded-md border border-hairline bg-surface-1 px-2.5 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong"

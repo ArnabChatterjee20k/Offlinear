@@ -12,6 +12,7 @@ import { currentAccount, ensureMember } from "./auth";
 import { setSession } from "./store/session";
 import { useAuth } from "./store/auth";
 import { useUI } from "./store/ui";
+import { loadNotifications } from "./store/notifications";
 
 /** Pick the project to show on load: the last one, else the first, else prompt
  *  to create one (first-run onboarding). */
@@ -28,6 +29,7 @@ async function selectStartupProject() {
 
 async function bootstrap() {
   const root = ReactDOM.createRoot(document.getElementById("root")!);
+  void loadNotifications();
   const render = (node: React.ReactNode) =>
     root.render(<React.StrictMode>{node}</React.StrictMode>);
 

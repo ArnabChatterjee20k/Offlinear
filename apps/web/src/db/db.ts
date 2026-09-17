@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { AppNotification } from "@/store/notifications";
 import type {
   Comment,
   Issue,
@@ -17,6 +18,12 @@ export interface GhMap {
   issueId: string;
   itemId: string;
   projectId: string;
+}
+
+/** Last-synced remote gist timestamp, for conflict detection. Local-only. */
+export interface GistMeta {
+  reportId: string;
+  remoteUpdatedAt: string;
 }
 
 /** An unsent issue being composed. Local-only; never synced. */
@@ -60,6 +67,8 @@ export class OfflinearDB extends Dexie {
   meta!: EntityTable<Meta, "key">;
   drafts!: EntityTable<Draft, "id">;
   ghmap!: EntityTable<GhMap, "issueId">;
+  gistmeta!: EntityTable<GistMeta, "reportId">;
+  notifications!: EntityTable<AppNotification, "id">;
 
   constructor() {
     super("offlinear");
@@ -80,6 +89,9 @@ export class OfflinearDB extends Dexie {
       issues: "id, key, stateId, projectId, assigneeId, parentId, updatedAt, boardOrder",
     });
     this.version(5).stores({ reports: "id, projectId, updatedAt" });
+    // Last-synced remote gist timestamp per report (conflict detection).
+    this.version(6).stores({ gistmeta: "reportId" });
+    this.version(7).stores({ notifications: "id, createdAt" });
   }
 }
 

@@ -16,6 +16,7 @@ import { Comments } from "./Comments";
 import { SubIssues } from "./SubIssues";
 import { Relations } from "./Relations";
 import { Markdown } from "./Markdown";
+import { NotificationBell } from "./Notifications";
 import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
 import { deleteIssue, updateIssue } from "@/store/mutations";
@@ -100,7 +101,8 @@ export function IssueBody({ issue, onBack }: { issue: Issue; onBack: () => void 
         </button>
         <StateIcon state={state} />
         <span className="font-mono text-[12px] text-ink-tertiary">{issue.key}</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          <NotificationBell />
           <IssueMenu issue={issue} onDeleted={onBack} />
         </div>
       </div>

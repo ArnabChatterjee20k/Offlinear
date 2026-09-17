@@ -6,7 +6,8 @@ import { db } from "@/db/db";
 import { useReport, useReports } from "@/hooks/useData";
 import { openReportPage } from "@/store/route";
 import { deleteReport, updateReport } from "@/store/mutations";
-import { publishReport } from "@/github/gists";
+import { publishReport, syncReportToGist } from "@/github/gists";
+import { NotificationBell } from "./Notifications";
 import { Markdown } from "./Markdown";
 import { Input } from "./ui/input";
 
@@ -28,13 +29,35 @@ export function ReportView({ reportId }: { reportId: string }) {
     setPubError(null);
     try {
       await updateReport(report.id, { title, body }); // flush latest before push
-      setGistUrl(await publishReport(report.id));
+      const { result, url } = await publishReport(report.id);
+      if (result === "conflict") setPubError("Gist changed remotely — resolve via the bell.");
+      else setGistUrl(url ?? null);
     } catch (e) {
       setPubError(String((e as Error).message));
     } finally {
       setPublishing(false);
     }
   };
+
+  // Auto-sync edits to the linked gist (debounced, conflict-aware).
+  const lastSynced = React.useRef("");
+  React.useEffect(() => {
+    lastSynced.current = report?.body ?? "";
+  }, [report?.id]);
+  React.useEffect(() => {
+    const r = report;
+    if (!r?.gistId || body === lastSynced.current) return;
+    const t = setTimeout(async () => {
+      try {
+        await updateReport(r.id, { title, body });
+        await syncReportToGist(r.id);
+        lastSynced.current = body;
+      } catch (e) {
+        console.error("[gist] auto-sync failed", e);
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [title, body, report]);
 
   React.useEffect(() => {
     if (report) {
@@ -106,6 +129,7 @@ export function ReportView({ reportId }: { reportId: string }) {
         )}
         {pubError && <span className="text-[12px] text-danger">{pubError}</span>}
         <div className="ml-auto flex items-center gap-1.5">
+          <NotificationBell />
           <button
             onClick={publish}
             disabled={publishing}
