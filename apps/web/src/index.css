@@ -56,6 +56,92 @@
   }
 }
 
+/* TipTap editor content */
+.tiptap .ProseMirror {
+  outline: none;
+}
+.tiptap .ProseMirror > * + * {
+  margin-top: 0.6em;
+}
+.tiptap h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-top: 1em;
+}
+.tiptap h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-top: 0.8em;
+}
+.tiptap h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tiptap p {
+  color: var(--ink-muted);
+}
+.tiptap ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.tiptap ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.tiptap li {
+  margin: 0.15em 0;
+}
+.tiptap li::marker {
+  color: var(--ink-tertiary);
+}
+.tiptap a {
+  color: var(--brand);
+  cursor: pointer;
+}
+.tiptap a[href^="issue:"],
+.tiptap a[href^="report:"] {
+  background: var(--surface-3);
+  border-radius: 4px;
+  padding: 0 4px;
+  text-decoration: none;
+}
+.tiptap code {
+  background: var(--surface-3);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-family: theme("fontFamily.mono");
+  font-size: 0.9em;
+  color: var(--ink);
+}
+.tiptap pre {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.tiptap pre code {
+  background: none;
+  padding: 0;
+}
+.tiptap blockquote {
+  border-left: 2px solid var(--hairline-strong);
+  padding-left: 0.8em;
+  color: var(--ink-subtle);
+}
+.tiptap .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-tertiary);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
 @layer utilities {
   .focus-ring {
     outline: none;

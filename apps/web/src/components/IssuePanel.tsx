@@ -15,8 +15,10 @@ import {
 import { Comments } from "./Comments";
 import { SubIssues } from "./SubIssues";
 import { Relations } from "./Relations";
-import { Markdown } from "./Markdown";
 import { NotificationBell } from "./Notifications";
+import { RichEditor, type RichEditorHandle } from "./RichEditor";
+import { IssuePicker, ReportPicker } from "./LinkPickers";
+import { db } from "@/db/db";
 import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
 import { deleteIssue, updateIssue } from "@/store/mutations";
@@ -79,12 +81,21 @@ export function IssueBody({ issue, onBack }: { issue: Issue; onBack: () => void 
 
   const [title, setTitle] = React.useState(issue.title);
   const [desc, setDesc] = React.useState(issue.description);
-  const [editingDesc, setEditingDesc] = React.useState(false);
+  const editorRef = React.useRef<RichEditorHandle>(null);
   React.useEffect(() => setTitle(issue.title), [issue.id, issue.title]);
+  React.useEffect(() => setDesc(issue.description), [issue.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced autosave for the description.
   React.useEffect(() => {
-    setDesc(issue.description);
-    setEditingDesc(false);
-  }, [issue.id, issue.description]);
+    if (desc === issue.description) return;
+    const t = setTimeout(() => updateIssue(issue.id, { description: desc }), 500);
+    return () => clearTimeout(t);
+  }, [desc, issue.id, issue.description]);
+
+  const insertIssueLink = async (id: string) => {
+    const i = await db.issues.get(id);
+    if (i) editorRef.current?.insertLink(`#${i.key} ${i.title}`, `issue:${id}`);
+  };
 
   const state = stateById.get(issue.stateId);
   const assignee = issue.assigneeId ? memberById.get(issue.assigneeId) : undefined;
@@ -130,34 +141,13 @@ export function IssueBody({ issue, onBack }: { issue: Issue; onBack: () => void 
             placeholder="Issue title"
           />
 
-          {editingDesc ? (
-            <textarea
-              autoFocus
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              onBlur={() => {
-                if (desc !== issue.description) updateIssue(issue.id, { description: desc });
-                setEditingDesc(false);
-              }}
-              rows={6}
-              className="w-full resize-none bg-transparent text-[14px] leading-relaxed text-ink-muted outline-none placeholder:text-ink-tertiary"
-              placeholder="Add a description… (Markdown supported)"
-            />
-          ) : issue.description.trim() ? (
-            <div
-              onClick={() => setEditingDesc(true)}
-              className="-mx-2 cursor-text rounded-md px-2 py-1 hover:bg-surface-1"
-            >
-              <Markdown>{issue.description}</Markdown>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <IssuePicker onPick={insertIssueLink} />
+              <ReportPicker onPick={(id, name) => editorRef.current?.insertLink(name, `report:${id}`)} />
             </div>
-          ) : (
-            <button
-              onClick={() => setEditingDesc(true)}
-              className="text-[14px] text-ink-tertiary hover:text-ink-subtle"
-            >
-              Add a description…
-            </button>
-          )}
+            <RichEditor ref={editorRef} resetKey={issue.id} value={desc} onChange={setDesc} />
+          </div>
 
           <SubIssues parentId={issue.id} />
           <Relations issue={issue} />
