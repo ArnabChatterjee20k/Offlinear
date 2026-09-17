@@ -72,13 +72,35 @@ export async function listProjects(): Promise<GhProject[]> {
 export interface GhItem {
   itemId: string;
   title: string;
+  body: string;
   status: string | null;
+  assignees: string[];
+  author: string | null;
 }
 
-/** All items on a project (title + Status single-select value). */
+/** The signed-in GitHub user's login (for filtering imports to your issues). */
+export async function getViewerLogin(): Promise<string | null> {
+  try {
+    const data = await gql<{ viewer: { login: string } }>(`query { viewer { login } }`);
+    return data.viewer.login;
+  } catch {
+    return null;
+  }
+}
+
+interface Content {
+  title?: string;
+  body?: string;
+  assignees?: { nodes: { login: string }[] };
+  author?: { login: string } | null;
+  creator?: { login: string } | null;
+}
+
+/** All items on a project (title, body, Status, assignees, author). */
 export async function getProjectItems(projectId: string): Promise<GhItem[]> {
   const items: GhItem[] = [];
   let cursor: string | null = null;
+  const contentFields = `title body assignees(first: 10) { nodes { login } }`;
   do {
     const data: {
       node: {
@@ -86,7 +108,7 @@ export async function getProjectItems(projectId: string): Promise<GhItem[]> {
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
           nodes: {
             id: string;
-            content: { title?: string } | null;
+            content: Content | null;
             fieldValues: {
               nodes: ({ name?: string; field?: { name?: string } } | Record<string, never>)[];
             };
@@ -101,7 +123,11 @@ export async function getProjectItems(projectId: string): Promise<GhItem[]> {
               pageInfo { hasNextPage endCursor }
               nodes {
                 id
-                content { ... on DraftIssue { title } ... on Issue { title } ... on PullRequest { title } }
+                content {
+                  ... on DraftIssue { ${contentFields} creator { login } }
+                  ... on Issue { ${contentFields} author { login } }
+                  ... on PullRequest { ${contentFields} author { login } }
+                }
                 fieldValues(first: 20) {
                   nodes {
                     ... on ProjectV2ItemFieldSingleSelectValue {
@@ -117,9 +143,17 @@ export async function getProjectItems(projectId: string): Promise<GhItem[]> {
       { id: projectId, cursor }
     );
     for (const n of data.node.items.nodes) {
+      const c = n.content ?? {};
       const status =
         n.fieldValues.nodes.find((f) => "field" in f && f.field?.name === "Status")?.name ?? null;
-      items.push({ itemId: n.id, title: n.content?.title ?? "(untitled)", status });
+      items.push({
+        itemId: n.id,
+        title: c.title ?? "(untitled)",
+        body: c.body ?? "",
+        status,
+        assignees: c.assignees?.nodes.map((a) => a.login) ?? [],
+        author: c.author?.login ?? c.creator?.login ?? null,
+      });
     }
     cursor = data.node.items.pageInfo.hasNextPage ? data.node.items.pageInfo.endCursor : null;
   } while (cursor);

@@ -7,6 +7,7 @@ import {
   addDraftIssue,
   getProjectItems,
   getStatusField,
+  getViewerLogin,
   setItemStatus,
   type GhItem,
   type GhProject,
@@ -91,7 +92,11 @@ export async function computeDiff(projectId: string): Promise<Diff> {
     }
   }
 
-  const onlyGithub = items.filter((it) => !usedItems.has(it.itemId));
+  // Import only *your* GitHub issues — ones you authored or are assigned to.
+  const viewer = await getViewerLogin();
+  const mine = (it: GhItem) =>
+    !viewer || it.author === viewer || it.assignees.includes(viewer);
+  const onlyGithub = items.filter((it) => !usedItems.has(it.itemId) && mine(it));
   return { matched, onlyLocal, onlyGithub };
 }
 
@@ -147,7 +152,7 @@ export async function importItems(
   let done = 0;
   for (const item of items) {
     const stateId = await ensureState(item.status);
-    const id = await createIssue({ title: item.title, stateId });
+    const id = await createIssue({ title: item.title, description: item.body, stateId });
     await db.ghmap.put({ issueId: id, itemId: item.itemId, projectId });
     onProgress?.(++done, items.length);
   }
