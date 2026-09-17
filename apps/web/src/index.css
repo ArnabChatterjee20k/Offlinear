@@ -134,6 +134,15 @@
   padding-left: 0.8em;
   color: var(--ink-subtle);
 }
+.tiptap img {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  margin: 0.4em 0;
+}
+.tiptap img.ProseMirror-selectednode {
+  outline: 2px solid var(--brand-focus);
+}
 .tiptap .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--ink-tertiary);

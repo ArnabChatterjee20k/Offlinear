@@ -1,4 +1,4 @@
-import { Account, Client, TablesDB } from "appwrite";
+import { Account, Client, TablesDB, Storage } from "appwrite";
 
 // Read from Vite env (apps/web/.env). No API key in the browser; the client
 // authenticates with a GitHub OAuth session and relies on table permissions
@@ -17,3 +17,6 @@ export const client = appwriteConfigured
 
 export const tablesDB = client ? new TablesDB(client) : null;
 export const account = client ? new Account(client) : null;
+export const storage = client ? new Storage(client) : null;
+export const ATTACH_BUCKET =
+  (import.meta.env.VITE_APPWRITE_BUCKET as string | undefined) ?? "attachments";

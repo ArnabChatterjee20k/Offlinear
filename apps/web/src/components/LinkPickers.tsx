@@ -1,10 +1,36 @@
 import * as React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Hash, AtSign, FileText } from "lucide-react";
+import { Hash, AtSign, FileText, Paperclip } from "lucide-react";
 import { db } from "@/db/db";
 import { useReports } from "@/hooks/useData";
 import { Input } from "./ui/input";
+
+/** Button + hidden file input to upload attachments (external upload). */
+export function AttachButton({ onFiles }: { onFiles: (files: FileList) => void }) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) onFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        className="flex items-center gap-1 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+        title="Upload a file or image"
+      >
+        <Paperclip className="h-3.5 w-3.5" /> Attach
+      </button>
+    </>
+  );
+}
 
 /** Popover to pick an issue and insert a cross-link. */
 export function IssuePicker({ onPick }: { onPick: (id: string) => void }) {

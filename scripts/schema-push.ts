@@ -4,7 +4,7 @@
 import { config } from "dotenv";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client, TablesDB, TablesDBIndexType, Permission, Role } from "node-appwrite";
+import { Client, TablesDB, TablesDBIndexType, Permission, Role, Storage } from "node-appwrite";
 
 config({ path: resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
 
@@ -210,6 +210,26 @@ async function main() {
       );
     }
   }
+
+  // Storage bucket for pasted/uploaded attachments. Public read so plain <img>
+  // URLs load; only signed-in users can write.
+  const storage = new Storage(client);
+  await ignore409(
+    storage.createBucket(
+      "attachments",
+      "attachments",
+      [
+        Permission.read(Role.any()),
+        Permission.create(Role.users()),
+        Permission.update(Role.users()),
+        Permission.delete(Role.users()),
+      ],
+      false,
+      true
+    ),
+    "bucket attachments"
+  );
+
   console.log("Schema push complete.");
 }
 

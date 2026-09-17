@@ -46,6 +46,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.6
         version: 1.2.16(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@tiptap/extension-image':
+        specifier: ^2.27.3
+        version: 2.27.3(@tiptap/core@2.27.3(@tiptap/pm@2.27.3))
       '@tiptap/extension-link':
         specifier: ^2.27.3
         version: 2.27.3(@tiptap/core@2.27.3(@tiptap/pm@2.27.3))(@tiptap/pm@2.27.3)
@@ -1175,6 +1178,11 @@ packages:
     peerDependencies:
       '@tiptap/core': ^2.7.0
       '@tiptap/pm': ^2.7.0
+
+  '@tiptap/extension-image@2.27.3':
+    resolution: {integrity: sha512-YCOxC+UOFisHVpowPc3UmUtJDV9tjKJLeHKef3DZ6h1ixOnp2LStuhy2ohcSjISg1mZlYrx+/GoYottjwj7pww==}
+    peerDependencies:
+      '@tiptap/core': ^2.7.0
 
   '@tiptap/extension-italic@2.27.3':
     resolution: {integrity: sha512-ycgP6h7QQ4WXojOlH7gQEWwzNEzkIkVzdfH6jAZtZ2nw71L5KO1t5kt6Iu382CmQa60skDTuErbfiBUx7a3e2A==}
@@ -3112,6 +3120,10 @@ snapshots:
     dependencies:
       '@tiptap/core': 2.27.3(@tiptap/pm@2.27.3)
       '@tiptap/pm': 2.27.3
+
+  '@tiptap/extension-image@2.27.3(@tiptap/core@2.27.3(@tiptap/pm@2.27.3))':
+    dependencies:
+      '@tiptap/core': 2.27.3(@tiptap/pm@2.27.3)
 
   '@tiptap/extension-italic@2.27.3(@tiptap/core@2.27.3(@tiptap/pm@2.27.3))':
     dependencies:

@@ -1,10 +1,12 @@
 import * as React from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import { openIssuePage, openReportPage } from "@/store/route";
+import { uploadAttachment } from "@/lib/uploads";
 
 /** Intercept clicks on issue:/report: links so they navigate in-app. */
 function onLinkClick(e: React.MouseEvent) {
@@ -20,6 +22,27 @@ function onLinkClick(e: React.MouseEvent) {
 export interface RichEditorHandle {
   /** Insert linked text at the cursor (used for issue/report cross-links). */
   insertLink: (label: string, href: string) => void;
+  /** Upload files and insert them (image → image node, else a link). */
+  insertFiles: (files: FileList | File[]) => void;
+}
+
+/** Upload each file and insert it into the editor. */
+async function insertUploads(editor: Editor, files: File[]) {
+  for (const file of files) {
+    try {
+      const up = await uploadAttachment(file);
+      if (up.isImage) editor.chain().focus().setImage({ src: up.url, alt: up.name }).run();
+      else
+        editor
+          .chain()
+          .focus()
+          .insertContent({ type: "text", text: up.name, marks: [{ type: "link", attrs: { href: up.url } }] })
+          .insertContent(" ")
+          .run();
+    } catch (e) {
+      console.error("[upload] failed", e);
+    }
+  }
 }
 
 /** TipTap WYSIWYG editor whose value is markdown (so it round-trips to gists
@@ -34,6 +57,7 @@ export const RichEditor = React.forwardRef<
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Link.configure({ openOnClick: false, autolink: false }),
+      Image,
       Placeholder.configure({ placeholder: "Write here…" }),
       Markdown.configure({ html: false, linkify: false, transformPastedText: true }),
     ],
@@ -41,6 +65,24 @@ export const RichEditor = React.forwardRef<
     editorProps: {
       attributes: {
         class: "max-w-none min-h-[50vh] outline-none text-[15px] leading-relaxed text-ink-muted",
+      },
+      handlePaste: (_view, event) => {
+        const files = Array.from(event.clipboardData?.files ?? []);
+        if (files.length && editor) {
+          event.preventDefault();
+          void insertUploads(editor, files);
+          return true;
+        }
+        return false;
+      },
+      handleDrop: (_view, event) => {
+        const files = Array.from((event as DragEvent).dataTransfer?.files ?? []);
+        if (files.length && editor) {
+          event.preventDefault();
+          void insertUploads(editor, files);
+          return true;
+        }
+        return false;
       },
     },
     onUpdate: ({ editor }) => onChange(editor.storage.markdown.getMarkdown()),
@@ -60,6 +102,9 @@ export const RichEditor = React.forwardRef<
         .insertContent({ type: "text", text: label, marks: [{ type: "link", attrs: { href } }] })
         .insertContent(" ")
         .run();
+    },
+    insertFiles: (files) => {
+      if (editor) void insertUploads(editor, Array.from(files));
     },
   }));
 
