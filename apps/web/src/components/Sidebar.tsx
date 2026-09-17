@@ -1,6 +1,8 @@
 import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useProjects, useDrafts } from "@/hooks/useData";
+import { useProjects, useDrafts, useReports } from "@/hooks/useData";
+import { createReport } from "@/store/mutations";
+import { openReportPage, useRoute } from "@/store/route";
 import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
 import { useUI } from "@/store/ui";
@@ -45,6 +47,7 @@ export function Sidebar() {
           <NavItem icon={Bot} label="Agents" />
         </nav>
         <Projects />
+        <Reports />
         <Drafts />
       </div>
 
@@ -98,6 +101,44 @@ function Projects() {
             <Plus className="h-4 w-4" /> New project
           </button>
         )}
+      </nav>
+    </div>
+  );
+}
+
+function Reports() {
+  const reports = useReports();
+  const currentProjectId = useUI((s) => s.currentProjectId);
+  const activeReportId = useRoute((s) => s.reportId);
+  if (!currentProjectId) return null;
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between px-2 py-1">
+        <span className="text-[11px] uppercase tracking-wider text-ink-tertiary">Reports</span>
+        <button
+          onClick={() => createReport().then((id) => openReportPage(id))}
+          title="New report"
+          className="rounded p-0.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <nav className="space-y-0.5">
+        {reports.map((r) => (
+          <button
+            key={r.id}
+            onClick={() => openReportPage(r.id)}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
+              r.id === activeReportId
+                ? "bg-surface-2 text-ink"
+                : "text-ink-subtle hover:bg-surface-1 hover:text-ink"
+            )}
+          >
+            <FileText className="h-4 w-4 shrink-0" />
+            <span className="truncate">{r.title || "Untitled"}</span>
+          </button>
+        ))}
       </nav>
     </div>
   );

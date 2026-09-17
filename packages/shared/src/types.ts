@@ -89,6 +89,14 @@ export interface Issue extends Synced {
   archivedAt: string | null;
 }
 
+/** A Notion-style document, scoped to a project, cross-linking issues/reports. */
+export interface Report extends Synced {
+  projectId: string | null;
+  title: string;
+  body: string; // markdown, with issue:<id> / report:<id> cross-links
+  authorId: string | null;
+}
+
 export type CommentSource = "human" | "agent";
 
 export interface Comment extends Synced {
@@ -105,7 +113,8 @@ export type EntityName =
   | "labels"
   | "members"
   | "issues"
-  | "comments";
+  | "comments"
+  | "reports";
 
 export interface EntityMap {
   teams: Team;
@@ -115,4 +124,5 @@ export interface EntityMap {
   members: Member;
   issues: Issue;
   comments: Comment;
+  reports: Report;
 }

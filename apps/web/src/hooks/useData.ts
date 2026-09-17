@@ -12,6 +12,18 @@ export const useTeams = () => useLiveQuery(() => db.teams.toArray(), [], []);
 export const useProjects = () =>
   useLiveQuery(() => db.projects.orderBy("name").toArray(), [], []);
 
+export const useReports = () => {
+  const projectId = useUI((s) => s.currentProjectId);
+  return useLiveQuery(
+    () => db.reports.where("projectId").equals(projectId ?? "").reverse().sortBy("updatedAt"),
+    [projectId],
+    []
+  );
+};
+
+export const useReport = (id: string | null) =>
+  useLiveQuery(() => (id ? db.reports.get(id) : undefined), [id]);
+
 /** Top-level issues (no parent) for the current project, ordered for the board. */
 export const useBoardIssues = () => {
   const projectId = useUI((s) => s.currentProjectId);

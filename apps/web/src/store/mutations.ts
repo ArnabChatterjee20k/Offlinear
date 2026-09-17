@@ -6,6 +6,7 @@ import {
   type Priority,
   type Project,
   type RelationKind,
+  type Report,
   type State,
   type StateType,
 } from "@offlinear/shared";
@@ -69,6 +70,60 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
       entityId: id,
       type: "update",
       patch,
+      baseRev: current.rev,
+      actorId: getActorId(),
+    })
+  );
+}
+
+// --- Reports ---------------------------------------------------------------
+
+export async function createReport(input?: { title?: string }): Promise<string> {
+  const id = newOpId();
+  const full: Omit<Report, "createdAt" | "updatedAt" | "rev"> = {
+    id,
+    projectId: useUI.getState().currentProjectId,
+    title: input?.title ?? "Untitled",
+    body: "",
+    authorId: getActorId(),
+  };
+  await commit(
+    makeOp<Report>({
+      entity: "reports",
+      entityId: id,
+      type: "create",
+      patch: full as Partial<Report>,
+      baseRev: 0,
+      actorId: getActorId(),
+    })
+  );
+  return id;
+}
+
+export async function updateReport(id: string, patch: Partial<Report>): Promise<void> {
+  const current = await db.reports.get(id);
+  if (!current) return;
+  await commit(
+    makeOp<Report>({
+      entity: "reports",
+      entityId: id,
+      type: "update",
+      patch,
+      baseRev: current.rev,
+      actorId: getActorId(),
+    })
+  );
+}
+
+export async function deleteReport(id: string): Promise<void> {
+  const current = await db.reports.get(id);
+  if (!current) return;
+  await commit(
+    makeOp<Report>({
+      entity: "reports",
+      entityId: id,
+      type: "delete",
+      patch: {},
       baseRev: current.rev,
       actorId: getActorId(),
     })

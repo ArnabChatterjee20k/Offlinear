@@ -7,6 +7,7 @@ import type {
   Op,
   Priority,
   Project,
+  Report,
   State,
   Team,
 } from "@offlinear/shared";
@@ -54,6 +55,7 @@ export class OfflinearDB extends Dexie {
   members!: EntityTable<Member, "id">;
   issues!: EntityTable<Issue, "id">;
   comments!: EntityTable<Comment, "id">;
+  reports!: EntityTable<Report, "id">;
   outbox!: EntityTable<OutboxEntry, "opId">;
   meta!: EntityTable<Meta, "key">;
   drafts!: EntityTable<Draft, "id">;
@@ -77,6 +79,7 @@ export class OfflinearDB extends Dexie {
       projects: "id, name",
       issues: "id, key, stateId, projectId, assigneeId, parentId, updatedAt, boardOrder",
     });
+    this.version(5).stores({ reports: "id, projectId, updatedAt" });
   }
 }
 

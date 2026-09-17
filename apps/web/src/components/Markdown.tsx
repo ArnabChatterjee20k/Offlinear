@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { openIssuePage, openReportPage } from "@/store/route";
 
 /**
  * GitHub-flavored markdown rendered with the app's dark tokens. Kept dependency-
@@ -16,14 +17,33 @@ export function Markdown({ children, className }: { children: string; className?
           h2: (p) => <h2 className="mb-2 mt-4 text-[16px] font-semibold text-ink" {...p} />,
           h3: (p) => <h3 className="mb-1.5 mt-3 text-[14px] font-semibold text-ink" {...p} />,
           p: (p) => <p className="my-2 first:mt-0 last:mb-0" {...p} />,
-          a: (p) => (
-            <a
-              className="text-brand hover:text-brand-hover underline underline-offset-2"
-              target="_blank"
-              rel="noreferrer noopener"
-              {...p}
-            />
-          ),
+          a: ({ href, children, ...p }) => {
+            // In-app cross-links: issue:<id> / report:<id>.
+            const m = /^(issue|report):(.+)$/.exec(href ?? "");
+            if (m) {
+              const nav = () =>
+                m[1] === "issue" ? openIssuePage(m[2]) : openReportPage(m[2]);
+              return (
+                <button
+                  onClick={nav}
+                  className="rounded bg-surface-3 px-1 text-brand hover:text-brand-hover"
+                >
+                  {children}
+                </button>
+              );
+            }
+            return (
+              <a
+                href={href}
+                className="text-brand hover:text-brand-hover underline underline-offset-2"
+                target="_blank"
+                rel="noreferrer noopener"
+                {...p}
+              >
+                {children}
+              </a>
+            );
+          },
           ul: (p) => <ul className="my-2 list-disc space-y-1 pl-5" {...p} />,
           ol: (p) => <ol className="my-2 list-decimal space-y-1 pl-5" {...p} />,
           li: (p) => <li className="marker:text-ink-tertiary" {...p} />,

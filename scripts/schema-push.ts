@@ -124,6 +124,16 @@ const TABLES: Table[] = [
     indexes: [{ key: "issueId", attrs: ["issueId"] }],
   },
   {
+    id: "reports",
+    attrs: [
+      { name: "projectId", kind: "string", size: 64 },
+      { name: "title", kind: "string", size: 512, required: true },
+      { name: "body", kind: "string", size: 200000 },
+      { name: "authorId", kind: "string", size: 64 },
+    ],
+    indexes: [{ key: "projectId", attrs: ["projectId"] }],
+  },
+  {
     // Server-side GitHub mapping (row id = issue id). Written by the
     // push-to-github function; not synced to the client.
     id: "sync_map",

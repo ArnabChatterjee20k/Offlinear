@@ -11,6 +11,7 @@ const TABLES: EntityName[] = [
   "members",
   "issues",
   "comments",
+  "reports",
 ];
 
 /** Strip Appwrite system ($-prefixed) fields and re-key $id → id. */
