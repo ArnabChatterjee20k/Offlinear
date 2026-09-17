@@ -27,7 +27,7 @@ export function loginWithGitHub(): void {
     OAuthProvider.Github,
     here,
     here,
-    ["read:user", "user:email", "read:org", "project"]
+    ["read:user", "user:email", "read:org", "project", "gist"]
   );
   if (typeof url === "string") window.location.href = url;
 }

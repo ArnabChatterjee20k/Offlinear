@@ -130,6 +130,7 @@ const TABLES: Table[] = [
       { name: "title", kind: "string", size: 512, required: true },
       { name: "body", kind: "string", size: 200000 },
       { name: "authorId", kind: "string", size: 64 },
+      { name: "gistId", kind: "string", size: 64 },
     ],
     indexes: [{ key: "projectId", attrs: ["projectId"] }],
   },

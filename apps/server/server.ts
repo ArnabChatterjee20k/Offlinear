@@ -96,6 +96,33 @@ Bun.serve({
       }
     }
 
+    // REST proxy (for Gists, which GraphQL can't create). Body: {method,path,body}.
+    if (url.pathname === "/api/gh/rest" && req.method === "POST") {
+      try {
+        const token = await ghToken();
+        const { method, path, body } = (await req.json()) as {
+          method: string;
+          path: string;
+          body?: unknown;
+        };
+        const res = await fetch(`https://api.github.com${path}`, {
+          method,
+          headers: {
+            Authorization: `bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/vnd.github+json",
+          },
+          body: body != null ? JSON.stringify(body) : undefined,
+        });
+        return new Response(await res.text(), {
+          status: res.status,
+          headers: cors(req, { "Content-Type": "application/json" }),
+        });
+      } catch (e) {
+        return json(req, { error: String((e as Error).message) }, 500);
+      }
+    }
+
     return serveStatic(url.pathname);
   },
 });

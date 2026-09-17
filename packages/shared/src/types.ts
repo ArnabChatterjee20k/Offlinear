@@ -95,6 +95,8 @@ export interface Report extends Synced {
   title: string;
   body: string; // markdown, with issue:<id> / report:<id> cross-links
   authorId: string | null;
+  /** Linked private GitHub Gist id, once published. */
+  gistId: string | null;
 }
 
 export type CommentSource = "human" | "agent";

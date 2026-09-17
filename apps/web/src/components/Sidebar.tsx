@@ -1,8 +1,10 @@
-import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github } from "lucide-react";
+import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github, DownloadCloud, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as React from "react";
 import { useProjects, useDrafts, useReports } from "@/hooks/useData";
 import { createReport } from "@/store/mutations";
 import { openReportPage, useRoute } from "@/store/route";
+import { importGists } from "@/github/gists";
 import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
 import { useUI } from "@/store/ui";
@@ -106,6 +108,30 @@ function Projects() {
   );
 }
 
+function ImportGistsButton() {
+  const [busy, setBusy] = React.useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      await importGists();
+    } catch (e) {
+      console.error("[gists] import failed", e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      onClick={run}
+      disabled={busy}
+      title="Import from GitHub Gists"
+      className="rounded p-0.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DownloadCloud className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
 function Reports() {
   const reports = useReports();
   const currentProjectId = useUI((s) => s.currentProjectId);
@@ -115,13 +141,16 @@ function Reports() {
     <div className="mt-3">
       <div className="flex items-center justify-between px-2 py-1">
         <span className="text-[11px] uppercase tracking-wider text-ink-tertiary">Reports</span>
-        <button
-          onClick={() => createReport().then((id) => openReportPage(id))}
-          title="New report"
-          className="rounded p-0.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <ImportGistsButton />
+          <button
+            onClick={() => createReport().then((id) => openReportPage(id))}
+            title="New report"
+            className="rounded p-0.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       <nav className="space-y-0.5">
         {reports.map((r) => (

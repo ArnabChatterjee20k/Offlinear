@@ -1,11 +1,12 @@
 import * as React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ArrowLeft, Hash, AtSign, Eye, Pencil, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, Hash, AtSign, Eye, Pencil, Trash2, FileText, Github, Loader2, ExternalLink } from "lucide-react";
 import { db } from "@/db/db";
 import { useReport, useReports } from "@/hooks/useData";
 import { openReportPage } from "@/store/route";
 import { deleteReport, updateReport } from "@/store/mutations";
+import { publishReport } from "@/github/gists";
 import { Markdown } from "./Markdown";
 import { Input } from "./ui/input";
 
@@ -15,8 +16,25 @@ export function ReportView({ reportId }: { reportId: string }) {
   const [title, setTitle] = React.useState("");
   const [body, setBody] = React.useState("");
   const [mode, setMode] = React.useState<"edit" | "preview">("edit");
+  const [publishing, setPublishing] = React.useState(false);
+  const [gistUrl, setGistUrl] = React.useState<string | null>(null);
+  const [pubError, setPubError] = React.useState<string | null>(null);
   const bodyRef = React.useRef<HTMLTextAreaElement>(null);
   const back = () => openReportPage(null);
+
+  const publish = async () => {
+    if (!report) return;
+    setPublishing(true);
+    setPubError(null);
+    try {
+      await updateReport(report.id, { title, body }); // flush latest before push
+      setGistUrl(await publishReport(report.id));
+    } catch (e) {
+      setPubError(String((e as Error).message));
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   React.useEffect(() => {
     if (report) {
@@ -75,7 +93,28 @@ export function ReportView({ reportId }: { reportId: string }) {
         </button>
         <FileText className="h-4 w-4 text-ink-tertiary" />
         <span className="text-[12px] text-ink-tertiary">Report</span>
+        {(gistUrl || report.gistId) && (
+          <a
+            href={gistUrl ?? `https://gist.github.com/${report.gistId}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1 text-[12px] text-ink-tertiary hover:text-ink"
+            title="Open gist"
+          >
+            <ExternalLink className="h-3 w-3" /> gist
+          </a>
+        )}
+        {pubError && <span className="text-[12px] text-danger">{pubError}</span>}
         <div className="ml-auto flex items-center gap-1.5">
+          <button
+            onClick={publish}
+            disabled={publishing}
+            className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+            title="Publish to a private GitHub Gist"
+          >
+            {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Github className="h-3.5 w-3.5" />}
+            {report.gistId ? "Update gist" : "Publish"}
+          </button>
           <button
             onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
             className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:text-ink"

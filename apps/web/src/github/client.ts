@@ -31,6 +31,39 @@ async function gql<T>(query: string, variables: Record<string, unknown> = {}): P
   return json.data as T;
 }
 
+/** GitHub REST call (for Gists — GraphQL can't create them). Mode-aware:
+ *  CLI → the bridge (which adds the gh token); OAuth → api.github.com direct. */
+export async function ghRest<T = unknown>(
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<T> {
+  const mode = await getMode();
+  let res: Response;
+  if (mode === "cli") {
+    res = await fetch(`${BRIDGE_URL}/rest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method, path, body }),
+    });
+  } else {
+    const token = await githubToken();
+    if (!token) throw new Error("Not connected to GitHub");
+    res = await fetch(`https://api.github.com${path}`, {
+      method,
+      headers: {
+        Authorization: `bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/vnd.github+json",
+      },
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+  }
+  const text = await res.text();
+  if (!res.ok) throw new Error(`GitHub ${res.status}: ${text.slice(0, 200)}`);
+  return (text ? JSON.parse(text) : {}) as T;
+}
+
 export interface GhProject {
   id: string;
   title: string;

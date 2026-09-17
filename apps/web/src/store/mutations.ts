@@ -78,14 +78,19 @@ export async function updateProject(id: string, patch: Partial<Project>): Promis
 
 // --- Reports ---------------------------------------------------------------
 
-export async function createReport(input?: { title?: string }): Promise<string> {
+export async function createReport(input?: {
+  title?: string;
+  body?: string;
+  gistId?: string | null;
+}): Promise<string> {
   const id = newOpId();
   const full: Omit<Report, "createdAt" | "updatedAt" | "rev"> = {
     id,
     projectId: useUI.getState().currentProjectId,
     title: input?.title ?? "Untitled",
-    body: "",
+    body: input?.body ?? "",
     authorId: getActorId(),
+    gistId: input?.gistId ?? null,
   };
   await commit(
     makeOp<Report>({
