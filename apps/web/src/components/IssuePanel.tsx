@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, ChevronUp, MoreHorizontal, Trash2, Link2, Archive } from "lucide-react";
+import { ArrowLeft, ChevronUp, MoreHorizontal, Trash2, Link2, Archive, Download } from "lucide-react";
+import { download, issueToMarkdown, json } from "@/lib/export";
 import { PRIORITY_LABELS, type Issue } from "@offlinear/shared";
 import { PriorityIcon, StateIcon } from "./icons";
 import { Avatar } from "./ui/primitives";
@@ -17,7 +18,7 @@ import { SubIssues } from "./SubIssues";
 import { Relations } from "./Relations";
 import { NotificationBell } from "./Notifications";
 import { RichEditor, type RichEditorHandle } from "./RichEditor";
-import { IssuePicker, ReportPicker } from "./LinkPickers";
+import { AttachButton, IssuePicker, ReportPicker } from "./LinkPickers";
 import { db } from "@/db/db";
 import { useIssue, useLookups } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
@@ -36,6 +37,12 @@ function IssueMenu({ issue, onDeleted }: { issue: Issue; onDeleted: () => void }
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={copyLink}>
           <Link2 className="h-3.5 w-3.5" /> Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => download(`${issue.key}.md`, issueToMarkdown(issue), "text/markdown")}>
+          <Download className="h-3.5 w-3.5" /> Export Markdown
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => download(`${issue.key}.json`, json(issue), "application/json")}>
+          <Download className="h-3.5 w-3.5" /> Export JSON
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => updateIssue(issue.id, { archivedAt: new Date().toISOString() })}
@@ -145,6 +152,7 @@ export function IssueBody({ issue, onBack }: { issue: Issue; onBack: () => void 
             <div className="flex items-center gap-1.5">
               <IssuePicker onPick={insertIssueLink} />
               <ReportPicker onPick={(id, name) => editorRef.current?.insertLink(name, `report:${id}`)} />
+              <AttachButton onFiles={(f) => editorRef.current?.insertFiles(f)} />
             </div>
             <RichEditor ref={editorRef} resetKey={issue.id} value={desc} onChange={setDesc} />
           </div>

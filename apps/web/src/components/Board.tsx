@@ -18,12 +18,21 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus, Columns3 } from "lucide-react";
+import { GripVertical, Plus, Columns3, Download } from "lucide-react";
 import type { Issue, State } from "@offlinear/shared";
 import { cn } from "@/lib/utils";
 import { StateIcon } from "./icons";
 import { IssueCard } from "./IssueCard";
 import { ManageColumns } from "./ManageColumns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { db } from "@/db/db";
+import { useMembers } from "@/hooks/useData";
+import { download, issuesToCsv, issuesToMarkdown, json, type IssueMaps } from "@/lib/export";
 import { useBoardIssues, useStates } from "@/hooks/useData";
 import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
@@ -155,6 +164,39 @@ function Column({ state, ids, issueById }: { state: State; ids: string[]; issueB
         </div>
       </SortableContext>
     </div>
+  );
+}
+
+function BoardExportMenu({ states }: { states: State[] }) {
+  const members = useMembers();
+  const currentProjectId = useUI((s) => s.currentProjectId);
+
+  const run = async (fmt: "csv" | "json" | "md") => {
+    const issues = await db.issues
+      .filter((i) => i.projectId === currentProjectId && !i.archivedAt)
+      .toArray();
+    const maps: IssueMaps = {
+      stateName: new Map(states.map((s) => [s.id, s.name])),
+      memberName: new Map(members.map((m) => [m.id, m.name])),
+    };
+    if (fmt === "csv") download("issues.csv", issuesToCsv(issues, maps), "text/csv");
+    else if (fmt === "json") download("issues.json", json(issues), "application/json");
+    else download("issues.md", issuesToMarkdown(issues, maps), "text/markdown");
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink">
+          <Download className="h-3.5 w-3.5" /> Export
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => run("csv")}>CSV</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => run("json")}>JSON</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => run("md")}>Markdown</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -290,12 +332,15 @@ export function Board() {
         <span className="text-[12px] text-ink-tertiary">
           Drag cards to reorder, or drag a column by its handle
         </span>
-        <button
-          onClick={() => setManageOpen(true)}
-          className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
-        >
-          <Columns3 className="h-3.5 w-3.5" /> Manage columns
-        </button>
+        <div className="flex items-center gap-2">
+          <BoardExportMenu states={states} />
+          <button
+            onClick={() => setManageOpen(true)}
+            className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+          >
+            <Columns3 className="h-3.5 w-3.5" /> Manage columns
+          </button>
+        </div>
       </div>
       <ManageColumns open={manageOpen} onClose={() => setManageOpen(false)} />
       <DndContext

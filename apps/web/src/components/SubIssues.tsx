@@ -2,9 +2,10 @@ import * as React from "react";
 import { Plus, X } from "lucide-react";
 import { StateIcon } from "./icons";
 import { Input } from "./ui/input";
+import { IssueSearch } from "./IssueSearch";
 import { useLookups, useSubIssues } from "@/hooks/useData";
 import { useUI } from "@/store/ui";
-import { addSubIssue } from "@/store/mutations";
+import { addSubIssue, setParent } from "@/store/mutations";
 
 export function SubIssues({ parentId }: { parentId: string }) {
   const subs = useSubIssues(parentId);
@@ -33,12 +34,27 @@ export function SubIssues({ parentId }: { parentId: string }) {
             </span>
           )}
         </h3>
-        <button
-          className="rounded p-1 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
-          onClick={() => setAdding(true)}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <IssueSearch
+            excludeId={parentId}
+            onPick={(id) => setParent(id, parentId)}
+            trigger={
+              <button
+                className="rounded px-1.5 py-0.5 text-[11px] text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+                title="Link an existing issue as a sub-issue"
+              >
+                Link
+              </button>
+            }
+          />
+          <button
+            className="rounded p-1 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+            title="Create a new sub-issue"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="divide-y divide-hairline rounded-lg border border-hairline">

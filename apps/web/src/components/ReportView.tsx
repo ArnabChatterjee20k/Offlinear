@@ -1,5 +1,12 @@
 import * as React from "react";
-import { ArrowLeft, Trash2, FileText, Github, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Trash2, FileText, Github, Loader2, ExternalLink, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { download, reportToMarkdown, json } from "@/lib/export";
 import { db } from "@/db/db";
 import { useReport } from "@/hooks/useData";
 import { openReportPage } from "@/store/route";
@@ -7,7 +14,7 @@ import { deleteReport, updateReport } from "@/store/mutations";
 import { publishReport, syncReportToGist } from "@/github/gists";
 import { NotificationBell } from "./Notifications";
 import { RichEditor, type RichEditorHandle } from "./RichEditor";
-import { IssuePicker, ReportPicker } from "./LinkPickers";
+import { AttachButton, IssuePicker, ReportPicker } from "./LinkPickers";
 
 /** Full-page Notion-style report editor (route /report/:id). */
 export function ReportView({ reportId }: { reportId: string }) {
@@ -124,6 +131,25 @@ export function ReportView({ reportId }: { reportId: string }) {
             {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Github className="h-3.5 w-3.5" />}
             {report.gistId ? "Update gist" : "Publish"}
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink" title="Export">
+                <Download className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => download(`${report.title || "report"}.md`, reportToMarkdown(report), "text/markdown")}
+              >
+                <Download className="h-3.5 w-3.5" /> Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => download(`${report.title || "report"}.json`, json(report), "application/json")}
+              >
+                <Download className="h-3.5 w-3.5" /> JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             onClick={() => {
               void deleteReport(report.id);
@@ -149,6 +175,7 @@ export function ReportView({ reportId }: { reportId: string }) {
         <div className="mt-3 flex items-center gap-1.5">
           <IssuePicker onPick={insertIssue} />
           <ReportPicker excludeId={report.id} onPick={insertReport} />
+          <AttachButton onFiles={(f) => editorRef.current?.insertFiles(f)} />
         </div>
 
         <RichEditor ref={editorRef} resetKey={report.id} value={body} onChange={setBody} />

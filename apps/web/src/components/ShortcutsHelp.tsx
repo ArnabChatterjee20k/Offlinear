@@ -55,6 +55,18 @@ const GROUPS: Group[] = [
     title: "Comments",
     items: [{ keys: [MOD, ENTER], label: "Submit comment" }],
   },
+  {
+    title: "Editor (type to format)",
+    items: [
+      { keys: ["# "], label: "Heading" },
+      { keys: ["- "], label: "Bullet list" },
+      { keys: ["1. "], label: "Numbered list" },
+      { keys: ["> "], label: "Quote" },
+      { keys: ["```"], label: "Code block" },
+      { keys: ["**b**"], label: "Bold" },
+      { keys: ["*i*"], label: "Italic" },
+    ],
+  },
 ];
 
 export function ShortcutsHelp() {
