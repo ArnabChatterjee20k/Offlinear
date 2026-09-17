@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Github, Loader2, ArrowUpRight, ArrowDownLeft, Terminal } from "lucide-react";
+import { Github, Loader2, ArrowUpRight, ArrowDownLeft, Terminal, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -8,6 +8,7 @@ import { githubToken, loginWithGitHub, logout } from "@/auth";
 import { listProjects, type GhProject } from "@/github/client";
 import { bridgeHealth, setMode, BRIDGE_URL } from "@/github/config";
 import {
+  backfillDescriptions,
   computeDiff,
   getSelectedProject,
   importItems,
@@ -28,7 +29,7 @@ export function GitHubDialog() {
   const [selected, setSelected] = React.useState<GhProject | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [diff, setDiff] = React.useState<Diff | null>(null);
-  const [busy, setBusy] = React.useState<null | "import" | "export" | "diff">(null);
+  const [busy, setBusy] = React.useState<null | "import" | "export" | "diff" | "backfill">(null);
   const [progress, setProgress] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -115,6 +116,22 @@ export function GitHubDialog() {
       await pushIssues(selected.id, diff.onlyLocal, (d, t) => setProgress(`Exporting ${d}/${t}…`));
       setProgress(null);
       await refreshDiff();
+    } catch (e) {
+      setError(String((e as Error).message));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runBackfill = async () => {
+    if (!selected) return;
+    setBusy("backfill");
+    setError(null);
+    try {
+      const n = await backfillDescriptions(selected.id, (d, t) =>
+        setProgress(`Fetching descriptions ${d}/${t}…`)
+      );
+      setProgress(`Filled ${n} description${n === 1 ? "" : "s"}`);
     } catch (e) {
       setError(String((e as Error).message));
     } finally {
@@ -249,6 +266,16 @@ export function GitHubDialog() {
                 running={busy === "export"}
                 disabled={busy != null || (diff?.onlyLocal.length ?? 0) === 0}
                 onRun={runExport}
+              />
+
+              <ActionCard
+                icon={<FileText className="h-4 w-4 text-ink" />}
+                title="Fetch descriptions"
+                desc="Fill empty descriptions from matching GitHub cards."
+                loading={false}
+                running={busy === "backfill"}
+                disabled={busy != null}
+                onRun={runBackfill}
               />
 
               <div className="flex items-center justify-between text-[12px] text-ink-tertiary">

@@ -1,6 +1,6 @@
 import type { Issue } from "@offlinear/shared";
 import { db } from "@/db/db";
-import { createIssue, createState, updateProject } from "@/store/mutations";
+import { createIssue, createState, updateIssue, updateProject } from "@/store/mutations";
 import { useUI } from "@/store/ui";
 import { DATABASE_ID, appwriteConfigured, tablesDB } from "@/sync/appwrite-config";
 import {
@@ -126,6 +126,39 @@ export async function pushIssues(
     await db.ghmap.put({ issueId: issue.id, itemId, projectId });
     onProgress?.(++done, issues.length);
   }
+}
+
+/** Backfill descriptions on existing issues from their matching GitHub cards
+ *  (by stored mapping, else exact title). Only fills issues whose description is
+ *  currently empty. Returns how many were updated. */
+export async function backfillDescriptions(
+  projectId: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<number> {
+  const pid = useUI.getState().currentProjectId;
+  const [issues, items, maps] = await Promise.all([
+    db.issues.filter((i) => i.projectId === pid && !i.archivedAt).toArray(),
+    getProjectItems(projectId),
+    db.ghmap.toArray(),
+  ]);
+  const itemById = new Map(items.map((it) => [it.itemId, it]));
+  const itemsByTitle = new Map(items.map((it) => [norm(it.title), it]));
+  const mapByIssue = new Map(maps.map((m) => [m.issueId, m]));
+
+  let updated = 0;
+  let done = 0;
+  for (const issue of issues) {
+    const mapped = mapByIssue.get(issue.id);
+    const item =
+      (mapped && itemById.get(mapped.itemId)) || itemsByTitle.get(norm(issue.title)) || null;
+    if (item && item.body.trim() && !issue.description.trim()) {
+      await updateIssue(issue.id, { description: item.body });
+      if (!mapped) await db.ghmap.put({ issueId: issue.id, itemId: item.itemId, projectId });
+      updated++;
+    }
+    onProgress?.(++done, issues.length);
+  }
+  return updated;
 }
 
 /** Import selected GitHub items as new local issues, placing each in the state
