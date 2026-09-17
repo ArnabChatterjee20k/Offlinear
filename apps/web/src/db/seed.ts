@@ -1,8 +1,9 @@
-import type { Comment, Issue, Label, Member, State, Team } from "@offlinear/shared";
+import type { Comment, Issue, Label, Member, Project, State, Team } from "@offlinear/shared";
 import { db } from "./db";
 
 interface SeedFile {
   teams: Team[];
+  projects?: Project[];
   states: State[];
   labels: Label[];
   members: Member[];
@@ -25,9 +26,10 @@ export async function ensureSeeded(): Promise<void> {
 
   await db.transaction(
     "rw",
-    [db.teams, db.states, db.labels, db.members, db.issues, db.comments, db.meta],
+    [db.teams, db.projects, db.states, db.labels, db.members, db.issues, db.comments, db.meta],
     async () => {
       await db.teams.bulkPut(data.teams);
+      if (data.projects) await db.projects.bulkPut(data.projects);
       await db.states.bulkPut(data.states);
       await db.labels.bulkPut(data.labels);
       await db.members.bulkPut(data.members);

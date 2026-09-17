@@ -146,7 +146,7 @@ export async function applyRemote(result: PullResult): Promise<void> {
 
   await db.transaction(
     "rw",
-    [db.teams, db.states, db.labels, db.members, db.issues, db.comments],
+    [db.teams, db.projects, db.states, db.labels, db.members, db.issues, db.comments, db.reports],
     async () => {
       for (const { entity, row, deleted } of result.rows) {
         const id = row.id as string;
