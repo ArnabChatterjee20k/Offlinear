@@ -18,11 +18,12 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical, Plus, Columns3 } from "lucide-react";
 import type { Issue, State } from "@offlinear/shared";
 import { cn } from "@/lib/utils";
 import { StateIcon } from "./icons";
 import { IssueCard } from "./IssueCard";
+import { ManageColumns } from "./ManageColumns";
 import { useBoardIssues, useStates } from "@/hooks/useData";
 import { LookupProvider } from "@/hooks/lookups";
 import { useUI } from "@/store/ui";
@@ -281,16 +282,29 @@ export function Board() {
   const active = activeId ? issueById.get(activeId) : null;
   const selection = useUI((s) => s.selection);
   const dragCount = activeId && selection.has(activeId) ? selection.size : 1;
+  const [manageOpen, setManageOpen] = React.useState(false);
 
   return (
     <LookupProvider>
+      <div className="flex items-center justify-between px-6 pt-3">
+        <span className="text-[12px] text-ink-tertiary">
+          Drag cards to reorder, or drag a column by its handle
+        </span>
+        <button
+          onClick={() => setManageOpen(true)}
+          className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+        >
+          <Columns3 className="h-3.5 w-3.5" /> Manage columns
+        </button>
+      </div>
+      <ManageColumns open={manageOpen} onClose={() => setManageOpen(false)} />
       <DndContext
         sensors={sensors}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
-        <div id="board" className="flex h-full gap-4 overflow-x-auto px-6 py-4">
+        <div id="board" className="flex h-[calc(100%-2.75rem)] gap-4 overflow-x-auto px-6 pb-4 pt-2">
           <SortableContext items={states.map((s) => COL + s.id)} strategy={horizontalListSortingStrategy}>
             {states.map((s) => (
               <Column key={s.id} state={s} ids={items[s.id] ?? []} issueById={issueById} />

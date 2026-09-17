@@ -244,6 +244,21 @@ export async function updateState(id: string, patch: Partial<State>): Promise<vo
   );
 }
 
+export async function deleteState(id: string): Promise<void> {
+  const current = await db.states.get(id);
+  if (!current) return;
+  await commit(
+    makeOp<State>({
+      entity: "states",
+      entityId: id,
+      type: "delete",
+      patch: {},
+      baseRev: current.rev,
+      actorId: getActorId(),
+    })
+  );
+}
+
 async function defaultStateId(): Promise<string> {
   const states = await db.states.orderBy("position").toArray();
   const todo = states.find((s) => s.type === "unstarted") ?? states[0];
