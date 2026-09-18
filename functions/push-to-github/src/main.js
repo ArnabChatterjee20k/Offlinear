@@ -26,6 +26,7 @@ function makeClient({ endpoint, project, key, token }) {
     });
     const j = await r.json();
     if (j.errors) throw new Error(j.errors.map((e) => e.message).join("; "));
+    if (!j.data) throw new Error(`GitHub ${r.status}: ${j.message || "no data returned"}`);
     return j.data;
   };
 
@@ -120,7 +121,12 @@ module.exports = async ({ req, res, log, error }) => {
   // Event trigger → sync the single changed issue.
   if (event) {
     if (event.includes(".delete")) return res.json({ skipped: "delete" });
-    return res.json(await syncIssue(req.bodyJson, ctx));
+    try {
+      return res.json(await syncIssue(req.bodyJson, ctx));
+    } catch (e) {
+      error(`sync failed: ${e.message}`);
+      return res.json({ error: e.message }, 200); // don't 503; keep retries sane
+    }
   }
 
   // Scheduled run → reconcile: push any issues not yet on GitHub.
@@ -140,8 +146,12 @@ module.exports = async ({ req, res, log, error }) => {
     const { rows } = await page.json();
     for (const issue of rows) {
       scanned++;
-      const r = await syncIssue(issue, ctx);
-      if (r.action === "created") created++;
+      try {
+        const r = await syncIssue(issue, ctx);
+        if (r.action === "created") created++;
+      } catch (e) {
+        error(`sync ${issue.$id} failed: ${e.message}`);
+      }
     }
     if (rows.length < 100) break;
     cursor = rows[rows.length - 1].$id;
