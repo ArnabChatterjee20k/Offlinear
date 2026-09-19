@@ -81,6 +81,31 @@ async function updateDraftContent({ gql, log }, itemId, title, body) {
   }
 }
 
+/** Find an existing board item whose title matches (real Issue/PR or draft),
+ *  so we adopt it instead of creating a duplicate. Returns {itemId, isDraft}. */
+async function findBoardItemByTitle({ gql }, projectId, title) {
+  const target = norm(title);
+  let cursor = null;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const d = await gql(
+      `query($id: ID!, $c: String) { node(id: $id) { ... on ProjectV2 {
+        items(first: 100, after: $c) { pageInfo { hasNextPage endCursor }
+          nodes { id content { __typename
+            ... on DraftIssue { title } ... on Issue { title } ... on PullRequest { title } } } } } } }`,
+      { id: projectId, c: cursor }
+    );
+    const items = d.node && d.node.items;
+    if (!items) return null;
+    for (const it of items.nodes) {
+      const t = it.content && it.content.title;
+      if (t && norm(t) === target) return { itemId: it.id, isDraft: it.content.__typename === "DraftIssue" };
+    }
+    if (!items.pageInfo.hasNextPage) return null;
+    cursor = items.pageInfo.endCursor;
+  }
+}
+
 /** Mirror one issue to its project's GitHub board.
  *  updateExisting=true also pushes edits (title/body/status) to a mapped item;
  *  false only creates missing items (used by the reconcile sweep). */
@@ -104,13 +129,25 @@ async function syncIssue(issue, ctx, updateExisting = false) {
     return { action: "updated", itemId: mapped.itemId };
   }
 
-  const data = await gql(
-    `mutation($p: ID!, $t: String!, $b: String) {
-      addProjectV2DraftIssue(input: { projectId: $p, title: $t, body: $b }) { projectItem { id } }
-    }`,
-    { p: projectId, t: issue.title, b: issue.description || "" }
-  );
-  const itemId = data.addProjectV2DraftIssue.projectItem.id;
+  // Adopt an existing board item with the same title before creating a new one,
+  // so a pre-existing real Issue (or leftover draft) never gets a duplicate.
+  const found = await findBoardItemByTitle(ctx, projectId, issue.title);
+  let itemId;
+  let action;
+  if (found) {
+    itemId = found.itemId;
+    if (found.isDraft) await updateDraftContent(ctx, itemId, issue.title, issue.description);
+    action = "adopted";
+  } else {
+    const data = await gql(
+      `mutation($p: ID!, $t: String!, $b: String) {
+        addProjectV2DraftIssue(input: { projectId: $p, title: $t, body: $b }) { projectItem { id } }
+      }`,
+      { p: projectId, t: issue.title, b: issue.description || "" }
+    );
+    itemId = data.addProjectV2DraftIssue.projectItem.id;
+    action = "created";
+  }
   await setStatus(ctx, projectId, itemId, issue.stateId);
 
   const now = new Date().toISOString();
@@ -118,8 +155,8 @@ async function syncIssue(issue, ctx, updateExisting = false) {
     method: "PUT",
     body: JSON.stringify({ data: { itemId, projectId, rev: 1, createdAt: now, updatedAt: now } }),
   });
-  log(`pushed ${issue.key || issue.$id} -> ${itemId}`);
-  return { action: "created", itemId };
+  log(`${action} ${issue.key || issue.$id} -> ${itemId}`);
+  return { action, itemId };
 }
 
 module.exports = async ({ req, res, log, error }) => {
@@ -162,6 +199,7 @@ module.exports = async ({ req, res, log, error }) => {
   // Scheduled run → reconcile: push any issues not yet on GitHub.
   let cursor = null;
   let created = 0;
+  let adopted = 0;
   let scanned = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -179,6 +217,7 @@ module.exports = async ({ req, res, log, error }) => {
       try {
         const r = await syncIssue(issue, ctx);
         if (r.action === "created") created++;
+        else if (r.action === "adopted") adopted++;
       } catch (e) {
         error(`sync ${issue.$id} failed: ${e.message}`);
       }
@@ -186,6 +225,6 @@ module.exports = async ({ req, res, log, error }) => {
     if (rows.length < 100) break;
     cursor = rows[rows.length - 1].$id;
   }
-  log(`reconcile: scanned ${scanned}, created ${created}`);
-  return res.json({ ok: true, scanned, created });
+  log(`reconcile: scanned ${scanned}, created ${created}, adopted ${adopted}`);
+  return res.json({ ok: true, scanned, created, adopted });
 };
