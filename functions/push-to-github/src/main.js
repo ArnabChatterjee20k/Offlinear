@@ -35,20 +35,74 @@ function makeClient({ endpoint, project, key, token }) {
 
 const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
 
-/** Mirror one issue to its project's GitHub board. Idempotent. */
-async function syncIssue(issue, { aw, gql, db, log }) {
-  if (!issue || !issue.$id) return { skipped: "no row" };
-
-  const existing = await aw(`${db}/tables/sync_map/rows/${issue.$id}`);
-  if (existing.ok) {
-    const row = await existing.json();
-    if (row.itemId) return { action: "exists" };
+/** Set a project item's Status single-select to match the issue's state name. */
+async function setStatus({ aw, gql, db, log }, projectId, itemId, stateId) {
+  try {
+    const stRes = await aw(`${db}/tables/states/rows/${stateId}`);
+    const stateName = stRes.ok ? (await stRes.json()).name : null;
+    if (!stateName) return;
+    const fd = await gql(
+      `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
+        field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } } } }`,
+      { id: projectId }
+    );
+    const field = fd.node && fd.node.field;
+    const opt = field && field.options.find((o) => norm(o.name) === norm(stateName));
+    if (opt) {
+      await gql(
+        `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
+          updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } }
+        }`,
+        { p: projectId, i: itemId, f: field.id, o: opt.id }
+      );
+    }
+  } catch (e) {
+    log(`status set skipped: ${e.message}`);
   }
+}
+
+/** Update the draft-issue title/body behind a project item (if it's a draft). */
+async function updateDraftContent({ gql, log }, itemId, title, body) {
+  try {
+    const q = await gql(
+      `query($id: ID!) { node(id: $id) { ... on ProjectV2Item { content { ... on DraftIssue { id } } } } }`,
+      { id: itemId }
+    );
+    const draftId = q.node && q.node.content && q.node.content.id;
+    if (!draftId) return; // real Issue/PR, not a draft we own
+    await gql(
+      `mutation($d: ID!, $t: String!, $b: String) {
+        updateProjectV2DraftIssue(input: { draftIssueId: $d, title: $t, body: $b }) { draftIssue { id } }
+      }`,
+      { d: draftId, t: title, b: body || "" }
+    );
+  } catch (e) {
+    log(`draft content update skipped: ${e.message}`);
+  }
+}
+
+/** Mirror one issue to its project's GitHub board.
+ *  updateExisting=true also pushes edits (title/body/status) to a mapped item;
+ *  false only creates missing items (used by the reconcile sweep). */
+async function syncIssue(issue, ctx, updateExisting = false) {
+  const { aw, db, gql, log } = ctx;
+  if (!issue || !issue.$id) return { skipped: "no row" };
 
   if (!issue.projectId) return { skipped: "no project" };
   const projRes = await aw(`${db}/tables/projects/rows/${issue.projectId}`);
   const projectId = projRes.ok ? (await projRes.json()).githubProjectId : null;
   if (!projectId) return { skipped: "project not linked" };
+
+  const existing = await aw(`${db}/tables/sync_map/rows/${issue.$id}`);
+  const mapped = existing.ok ? await existing.json() : null;
+
+  if (mapped && mapped.itemId) {
+    if (!updateExisting) return { action: "exists" };
+    await updateDraftContent(ctx, mapped.itemId, issue.title, issue.description);
+    await setStatus(ctx, projectId, mapped.itemId, issue.stateId);
+    log(`updated ${issue.key || issue.$id} -> ${mapped.itemId}`);
+    return { action: "updated", itemId: mapped.itemId };
+  }
 
   const data = await gql(
     `mutation($p: ID!, $t: String!, $b: String) {
@@ -57,31 +111,7 @@ async function syncIssue(issue, { aw, gql, db, log }) {
     { p: projectId, t: issue.title, b: issue.description || "" }
   );
   const itemId = data.addProjectV2DraftIssue.projectItem.id;
-
-  // Set the item's Status to match the issue's state column.
-  try {
-    const stRes = await aw(`${db}/tables/states/rows/${issue.stateId}`);
-    const stateName = stRes.ok ? (await stRes.json()).name : null;
-    if (stateName) {
-      const fd = await gql(
-        `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
-          field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } } } }`,
-        { id: projectId }
-      );
-      const field = fd.node && fd.node.field;
-      const opt = field && field.options.find((o) => norm(o.name) === norm(stateName));
-      if (opt) {
-        await gql(
-          `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
-            updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } }
-          }`,
-          { p: projectId, i: itemId, f: field.id, o: opt.id }
-        );
-      }
-    }
-  } catch (e) {
-    log(`status set skipped: ${e.message}`);
-  }
+  await setStatus(ctx, projectId, itemId, issue.stateId);
 
   const now = new Date().toISOString();
   await aw(`${db}/tables/sync_map/rows/${issue.$id}`, {
@@ -122,7 +152,7 @@ module.exports = async ({ req, res, log, error }) => {
   if (event) {
     if (event.includes(".delete")) return res.json({ skipped: "delete" });
     try {
-      return res.json(await syncIssue(req.bodyJson, ctx));
+      return res.json(await syncIssue(req.bodyJson, ctx, true)); // push edits too
     } catch (e) {
       error(`sync failed: ${e.message}`);
       return res.json({ error: e.message }, 200); // don't 503; keep retries sane
