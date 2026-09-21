@@ -8,6 +8,14 @@ import { Markdown } from "tiptap-markdown";
 import { openIssuePage, openReportPage } from "@/store/route";
 import { uploadAttachment } from "@/lib/uploads";
 
+/** Heuristic: does this pasted text look like markdown we should parse rather
+ *  than insert verbatim? Covers headings, fences, lists, tables, quotes,
+ *  bold/italic, links/images. */
+function looksLikeMarkdown(text: string): boolean {
+  return /(^|\n)\s{0,3}#{1,6}\s|```|(^|\n)\s*[-*+]\s|(^|\n)\s*\d+\.\s|(^|\n)\s*>\s|(^|\n)\s*\|.*\|/.test(text) ||
+    /\*\*[^*]+\*\*|__[^_]+__|\[[^\]]+\]\([^)]+\)|!\[[^\]]*\]\([^)]+\)/.test(text);
+}
+
 /** Intercept clicks on issue:/report: links so they navigate in-app. */
 function onLinkClick(e: React.MouseEvent) {
   const a = (e.target as HTMLElement).closest("a");
@@ -50,10 +58,11 @@ async function insertUploads(editor: Editor, files: File[]) {
  *  formatting via markdown shortcuts (# , - , **bold**, > , ``` …). */
 export const RichEditor = React.forwardRef<
   RichEditorHandle,
-  { value: string; onChange: (markdown: string) => void; resetKey: string }
->(({ value, onChange, resetKey }, ref) => {
+  { value: string; onChange: (markdown: string) => void; resetKey: string; editable?: boolean }
+>(({ value, onChange, resetKey, editable = true }, ref) => {
   const editor = useEditor({
     immediatelyRender: false,
+    editable,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Link.configure({ openOnClick: false, autolink: false }),
@@ -67,8 +76,20 @@ export const RichEditor = React.forwardRef<
         class: "max-w-none min-h-[50vh] outline-none text-[15px] leading-relaxed text-ink-muted",
       },
       handlePaste: (_view, event) => {
-        const files = Array.from(event.clipboardData?.files ?? []);
-        if (files.length && editor) {
+        const cd = event.clipboardData;
+        const text = cd?.getData("text/plain") ?? "";
+        const files = Array.from(cd?.files ?? []);
+        // Text-first: parse pasted markdown into real nodes (tiptap-markdown's
+        // clipboardTextParser is skipped whenever the clipboard also carries
+        // HTML, which it usually does). Take this before the file branch so a
+        // synthetic .md/text blob some apps attach isn't uploaded to Storage.
+        if (text.trim() && looksLikeMarkdown(text) && editor) {
+          event.preventDefault();
+          editor.commands.insertContent(text);
+          return true;
+        }
+        // Real image/file paste (screenshots, copied files) → upload.
+        if (files.length && !text.trim() && editor) {
           event.preventDefault();
           void insertUploads(editor, files);
           return true;
@@ -76,10 +97,17 @@ export const RichEditor = React.forwardRef<
         return false;
       },
       handleDrop: (_view, event) => {
-        const files = Array.from((event as DragEvent).dataTransfer?.files ?? []);
+        const dt = (event as DragEvent).dataTransfer;
+        const text = dt?.getData("text/plain") ?? "";
+        const files = Array.from(dt?.files ?? []);
         if (files.length && editor) {
           event.preventDefault();
           void insertUploads(editor, files);
+          return true;
+        }
+        if (text.trim() && looksLikeMarkdown(text) && editor) {
+          event.preventDefault();
+          editor.commands.insertContent(text);
           return true;
         }
         return false;
@@ -93,6 +121,11 @@ export const RichEditor = React.forwardRef<
     if (editor && !editor.isDestroyed) editor.commands.setContent(value, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey, editor]);
+
+  // Toggle read-only (preview) without recreating the editor.
+  React.useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.setEditable(editable);
+  }, [editable, editor]);
 
   React.useImperativeHandle(ref, () => ({
     insertLink: (label, href) => {

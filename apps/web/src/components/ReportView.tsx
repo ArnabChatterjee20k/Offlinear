@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowLeft, Trash2, FileText, Github, Loader2, ExternalLink, Download } from "lucide-react";
+import { ArrowLeft, Trash2, FileText, Github, Loader2, ExternalLink, Download, Eye, Pencil } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ export function ReportView({ reportId }: { reportId: string }) {
   const [title, setTitle] = React.useState("");
   const [body, setBody] = React.useState("");
   const [publishing, setPublishing] = React.useState(false);
+  const [preview, setPreview] = React.useState(false);
   const [gistUrl, setGistUrl] = React.useState<string | null>(null);
   const [pubError, setPubError] = React.useState<string | null>(null);
   const editorRef = React.useRef<RichEditorHandle>(null);
@@ -123,6 +124,14 @@ export function ReportView({ reportId }: { reportId: string }) {
         <div className="ml-auto flex items-center gap-1.5">
           <NotificationBell />
           <button
+            onClick={() => setPreview((p) => !p)}
+            className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+            title={preview ? "Back to editing" : "Preview rendered report"}
+          >
+            {preview ? <Pencil className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            {preview ? "Edit" : "Preview"}
+          </button>
+          <button
             onClick={publish}
             disabled={publishing}
             className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
@@ -172,13 +181,15 @@ export function ReportView({ reportId }: { reportId: string }) {
           className="w-full resize-none bg-transparent text-[28px] font-semibold leading-tight tracking-tight text-ink outline-none placeholder:text-ink-tertiary"
         />
 
-        <div className="mt-3 flex items-center gap-1.5">
-          <IssuePicker onPick={insertIssue} />
-          <ReportPicker excludeId={report.id} onPick={insertReport} />
-          <AttachButton onFiles={(f) => editorRef.current?.insertFiles(f)} />
-        </div>
+        {!preview && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <IssuePicker onPick={insertIssue} />
+            <ReportPicker excludeId={report.id} onPick={insertReport} />
+            <AttachButton onFiles={(f) => editorRef.current?.insertFiles(f)} />
+          </div>
+        )}
 
-        <RichEditor ref={editorRef} resetKey={report.id} value={body} onChange={setBody} />
+        <RichEditor ref={editorRef} resetKey={report.id} value={body} onChange={setBody} editable={!preview} />
       </div>
     </div>
   );
