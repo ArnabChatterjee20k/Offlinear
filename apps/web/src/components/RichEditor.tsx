@@ -5,8 +5,24 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
+import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
 import { openIssuePage, openReportPage } from "@/store/route";
 import { uploadAttachment } from "@/lib/uploads";
+
+/** Parse a markdown string in BLOCK mode and insert it at the selection as real
+ *  nodes. We go through ProseMirror's DOMParser directly rather than
+ *  editor.commands.insertContent — tiptap-markdown patches insertContent to
+ *  re-parse in {inline:true} mode, which is meant for inline snippets, so a
+ *  full multi-block document (headings, fenced code, lists) round-trips more
+ *  faithfully this way. */
+function insertMarkdown(editor: Editor, markdown: string) {
+  const html = editor.storage.markdown.parser.parse(markdown); // block-mode HTML
+  const body = new window.DOMParser().parseFromString(html, "text/html").body;
+  const slice = PMDOMParser.fromSchema(editor.schema).parseSlice(body, { preserveWhitespace: true });
+  const { state, view } = editor;
+  view.focus();
+  view.dispatch(state.tr.replaceSelection(slice).scrollIntoView());
+}
 
 /** Heuristic: does this pasted text look like markdown we should parse rather
  *  than insert verbatim? Covers headings, fences, lists, tables, quotes,
@@ -85,7 +101,7 @@ export const RichEditor = React.forwardRef<
         // synthetic .md/text blob some apps attach isn't uploaded to Storage.
         if (text.trim() && looksLikeMarkdown(text) && editor) {
           event.preventDefault();
-          editor.commands.insertContent(text);
+          insertMarkdown(editor, text);
           return true;
         }
         // Real image/file paste (screenshots, copied files) → upload.
@@ -107,7 +123,7 @@ export const RichEditor = React.forwardRef<
         }
         if (text.trim() && looksLikeMarkdown(text) && editor) {
           event.preventDefault();
-          editor.commands.insertContent(text);
+          insertMarkdown(editor, text);
           return true;
         }
         return false;
