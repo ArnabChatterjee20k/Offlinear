@@ -143,6 +143,26 @@
 .tiptap img.ProseMirror-selectednode {
   outline: 2px solid var(--brand-focus);
 }
+.tiptap .mermaid-view {
+  margin: 0.6em 0;
+}
+.tiptap .mermaid-diagram {
+  display: flex;
+  justify-content: center;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+.tiptap .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.tiptap .mermaid-error {
+  color: var(--danger);
+  white-space: pre-wrap;
+}
 .tiptap .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--ink-tertiary);

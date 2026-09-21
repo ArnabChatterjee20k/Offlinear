@@ -6,6 +6,7 @@ import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
+import { MermaidCodeBlock } from "./MermaidCodeBlock";
 import { openIssuePage, openReportPage } from "@/store/route";
 import { uploadAttachment } from "@/lib/uploads";
 
@@ -80,7 +81,8 @@ export const RichEditor = React.forwardRef<
     immediatelyRender: false,
     editable,
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      StarterKit.configure({ heading: { levels: [1, 2, 3] }, codeBlock: false }),
+      MermaidCodeBlock,
       Link.configure({ openOnClick: false, autolink: false }),
       Image,
       Placeholder.configure({ placeholder: "Write here…" }),
