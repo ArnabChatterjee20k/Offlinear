@@ -50,6 +50,9 @@ const events = [
 ];
 // Daily reconcile sweep (03:00 UTC): push any issues not yet on GitHub.
 const SCHEDULE = process.env.SYNC_SCHEDULE ?? "0 3 * * *";
+// The daily reconcile repairs drift across every mapped issue (draft body/title
+// + status), so it needs more than the 15s default.
+const TIMEOUT = Number(process.env.SYNC_TIMEOUT ?? 300);
 
 const variables: Record<string, string> = {
   APPWRITE_API_KEY: APPWRITE_API_KEY!,
@@ -69,7 +72,7 @@ async function main() {
       undefined,
       events,
       SCHEDULE,
-      15,
+      TIMEOUT,
       true,
       true,
       "src/main.js",
@@ -78,7 +81,7 @@ async function main() {
     console.log("  + created function");
   } catch (e: any) {
     if (e?.code === 409) {
-      await fns.update(FN, FN, Runtime.Node22, undefined, events, SCHEDULE, 15, true, true, "src/main.js", "npm install");
+      await fns.update(FN, FN, Runtime.Node22, undefined, events, SCHEDULE, TIMEOUT, true, true, "src/main.js", "npm install");
       console.log("  = function exists (events updated)");
     } else throw e;
   }

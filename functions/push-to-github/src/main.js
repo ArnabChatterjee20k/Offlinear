@@ -35,18 +35,28 @@ function makeClient({ endpoint, project, key, token }) {
 
 const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, " ").trim();
 
+/** Look up (and cache per project) the Status single-select field + options. */
+async function statusField(ctx, projectId) {
+  if (!ctx.fieldCache) ctx.fieldCache = new Map();
+  if (ctx.fieldCache.has(projectId)) return ctx.fieldCache.get(projectId);
+  const fd = await ctx.gql(
+    `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
+      field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } } } }`,
+    { id: projectId }
+  );
+  const field = (fd.node && fd.node.field) || null;
+  ctx.fieldCache.set(projectId, field);
+  return field;
+}
+
 /** Set a project item's Status single-select to match the issue's state name. */
-async function setStatus({ aw, gql, db, log }, projectId, itemId, stateId) {
+async function setStatus(ctx, projectId, itemId, stateId) {
+  const { aw, gql, db, log } = ctx;
   try {
     const stRes = await aw(`${db}/tables/states/rows/${stateId}`);
     const stateName = stRes.ok ? (await stRes.json()).name : null;
     if (!stateName) return;
-    const fd = await gql(
-      `query($id: ID!) { node(id: $id) { ... on ProjectV2 {
-        field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } } } } }`,
-      { id: projectId }
-    );
-    const field = fd.node && fd.node.field;
+    const field = await statusField(ctx, projectId);
     const opt = field && field.options.find((o) => norm(o.name) === norm(stateName));
     if (opt) {
       await gql(
@@ -61,23 +71,30 @@ async function setStatus({ aw, gql, db, log }, projectId, itemId, stateId) {
   }
 }
 
-/** Update the draft-issue title/body behind a project item (if it's a draft). */
+const normBody = (s) => (s || "").replace(/\r\n/g, "\n").replace(/\s+$/g, "").trim();
+
+/** Update the draft-issue title/body behind a project item (if it's a draft).
+ *  Skips the write when both already match, so a repairing reconcile only
+ *  touches items that actually drifted. */
 async function updateDraftContent({ gql, log }, itemId, title, body) {
   try {
     const q = await gql(
-      `query($id: ID!) { node(id: $id) { ... on ProjectV2Item { content { ... on DraftIssue { id } } } } }`,
+      `query($id: ID!) { node(id: $id) { ... on ProjectV2Item { content { ... on DraftIssue { id title body } } } } }`,
       { id: itemId }
     );
-    const draftId = q.node && q.node.content && q.node.content.id;
-    if (!draftId) return; // real Issue/PR, not a draft we own
+    const content = q.node && q.node.content;
+    if (!content || !content.id) return false; // real Issue/PR, not a draft we own
+    if (content.title === title && normBody(content.body) === normBody(body)) return false;
     await gql(
       `mutation($d: ID!, $t: String!, $b: String) {
         updateProjectV2DraftIssue(input: { draftIssueId: $d, title: $t, body: $b }) { draftIssue { id } }
       }`,
-      { d: draftId, t: title, b: body || "" }
+      { d: content.id, t: title, b: body || "" }
     );
+    return true;
   } catch (e) {
     log(`draft content update skipped: ${e.message}`);
+    return false;
   }
 }
 
@@ -123,10 +140,10 @@ async function syncIssue(issue, ctx, updateExisting = false) {
 
   if (mapped && mapped.itemId) {
     if (!updateExisting) return { action: "exists" };
-    await updateDraftContent(ctx, mapped.itemId, issue.title, issue.description);
+    const changed = await updateDraftContent(ctx, mapped.itemId, issue.title, issue.description);
     await setStatus(ctx, projectId, mapped.itemId, issue.stateId);
-    log(`updated ${issue.key || issue.$id} -> ${mapped.itemId}`);
-    return { action: "updated", itemId: mapped.itemId };
+    if (changed) log(`updated ${issue.key || issue.$id} -> ${mapped.itemId}`);
+    return { action: changed ? "updated" : "exists", itemId: mapped.itemId };
   }
 
   // Adopt an existing board item with the same title before creating a new one,
@@ -200,6 +217,7 @@ module.exports = async ({ req, res, log, error }) => {
   let cursor = null;
   let created = 0;
   let adopted = 0;
+  let updated = 0;
   let scanned = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -215,9 +233,12 @@ module.exports = async ({ req, res, log, error }) => {
     for (const issue of rows) {
       scanned++;
       try {
-        const r = await syncIssue(issue, ctx);
+        // updateExisting=true → the sweep also repairs drifted body/title/status,
+        // not just creating missing items. updateDraftContent no-ops when in sync.
+        const r = await syncIssue(issue, ctx, true);
         if (r.action === "created") created++;
         else if (r.action === "adopted") adopted++;
+        else if (r.action === "updated") updated++;
       } catch (e) {
         error(`sync ${issue.$id} failed: ${e.message}`);
       }
@@ -225,6 +246,6 @@ module.exports = async ({ req, res, log, error }) => {
     if (rows.length < 100) break;
     cursor = rows[rows.length - 1].$id;
   }
-  log(`reconcile: scanned ${scanned}, created ${created}, adopted ${adopted}`);
-  return res.json({ ok: true, scanned, created, adopted });
+  log(`reconcile: scanned ${scanned}, created ${created}, adopted ${adopted}, updated ${updated}`);
+  return res.json({ ok: true, scanned, created, adopted, updated });
 };
