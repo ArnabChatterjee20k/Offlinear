@@ -12,6 +12,12 @@ import {
   X,
   Copy,
   CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  CheckSquare,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listPullRequests, type GhPull } from "@/github/client";
@@ -104,6 +110,18 @@ function toMarkdown(prs: GhPull[]): string {
   return prs.map((p) => `[${p.repo} #${p.number}](${p.url})`).join("\n");
 }
 
+/** Loose fuzzy match: substring, else in-order subsequence of the query chars. */
+function fuzzy(query: string, text: string): boolean {
+  const raw = query.toLowerCase().trim();
+  if (!raw) return true;
+  const t = text.toLowerCase();
+  if (t.includes(raw)) return true;
+  const q = raw.replace(/\s+/g, "");
+  let i = 0;
+  for (let j = 0; j < t.length && i < q.length; j++) if (t[j] === q[i]) i++;
+  return i === q.length;
+}
+
 export function PRsView() {
   const [prs, setPrs] = React.useState<GhPull[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -112,6 +130,8 @@ export function PRsView() {
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [anchor, setAnchor] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [query, setQuery] = React.useState("");
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -129,12 +149,20 @@ export function PRsView() {
     void load();
   }, [load]);
 
-  const groups = React.useMemo(() => {
+  const searching = query.trim().length > 0;
+
+  // Fuzzy filter across title, repo, owner and number.
+  const filtered = React.useMemo(() => {
     const list = prs ?? [];
-    if (groupBy === "none") return [{ key: "", type: "", prs: list }];
+    if (!searching) return list;
+    return list.filter((pr) => fuzzy(query, `${pr.repo} #${pr.number} ${pr.title} ${pr.owner}`));
+  }, [prs, query, searching]);
+
+  const groups = React.useMemo(() => {
+    if (groupBy === "none") return [{ key: "", type: "", prs: filtered }];
     const map = new Map<string, GhPull[]>();
     const typeOf = new Map<string, string>();
-    for (const pr of list) {
+    for (const pr of filtered) {
       const key = groupBy === "org" ? pr.owner : pr.repo;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(pr);
@@ -143,11 +171,35 @@ export function PRsView() {
     return [...map.entries()]
       .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
       .map(([key, prs]) => ({ key, type: typeOf.get(key) ?? "", prs }));
-  }, [prs, groupBy]);
+  }, [filtered, groupBy]);
 
   // Visual order of PR ids (across groups) — drives Shift range-select.
   const orderedIds = React.useMemo(() => groups.flatMap((g) => g.prs.map((p) => p.id)), [groups]);
   const byId = React.useMemo(() => new Map((prs ?? []).map((p) => [p.id, p])), [prs]);
+
+  // Groups start collapsed; changing the grouping recollapses.
+  React.useEffect(() => setExpanded(new Set()), [groupBy]);
+
+  const isOpen = (key: string) => groupBy === "none" || searching || expanded.has(key);
+  const toggleGroup = (key: string) =>
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      n.has(key) ? n.delete(key) : n.add(key);
+      return n;
+    });
+  const allExpanded = groups.length > 0 && groups.every((g) => expanded.has(g.key));
+  const toggleAll = () => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.key)));
+
+  // Select / deselect every PR in a group (for quick copy of a whole org/repo).
+  const selectGroup = (g: { prs: GhPull[] }) => {
+    const ids = g.prs.map((p) => p.id);
+    const allSel = ids.length > 0 && ids.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const n = new Set(prev);
+      ids.forEach((id) => (allSel ? n.delete(id) : n.add(id)));
+      return n;
+    });
+  };
 
   const toggle = (set: Set<string>, id: string) => {
     const next = new Set(set);
@@ -225,10 +277,23 @@ export function PRsView() {
         {selected.size > 0 ? (
           <span className="text-[12px] text-brand">{selected.size} selected</span>
         ) : (
-          prs && <span className="text-[12px] text-ink-tertiary">{prs.length} open</span>
+          prs && (
+            <span className="text-[12px] text-ink-tertiary">
+              {searching ? `${filtered.length} of ${prs.length}` : `${prs.length} open`}
+            </span>
+          )
         )}
         {error && <span className="ml-2 truncate text-[12px] text-danger">{error}</span>}
         <div className="ml-auto flex items-center gap-2">
+          {groupBy !== "none" && groups.length > 0 && !searching && (
+            <button
+              onClick={toggleAll}
+              title={allExpanded ? "Collapse all" : "Expand all"}
+              className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface-2 hover:text-ink"
+            >
+              {allExpanded ? <ChevronsDownUp className="h-4 w-4" /> : <ChevronsUpDown className="h-4 w-4" />}
+            </button>
+          )}
           {selected.size > 0 && (
             <>
               <button
@@ -260,6 +325,29 @@ export function PRsView() {
         </div>
       </div>
 
+      {prs && prs.length > 0 && (
+        <div className="border-b border-hairline px-5 py-2">
+          <div className="mx-auto flex max-w-[900px] items-center gap-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search PRs, repos, orgs…"
+              className="w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-tertiary"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                title="Clear search"
+                className="rounded p-0.5 text-ink-tertiary hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className={cn("mx-auto w-full max-w-[900px] flex-1 overflow-y-auto px-6 py-5", userSelect)}>
         {loading && !prs ? (
           <div className="flex h-full items-center justify-center gap-2 text-[13px] text-ink-subtle">
@@ -278,34 +366,75 @@ export function PRsView() {
             <p className="text-[14px]">No open pull requests.</p>
             <p className="text-[12px] text-ink-tertiary">PRs you author across your repos and orgs show up here.</p>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {groups.map((g) => (
-              <div key={g.key || "all"}>
-                {groupBy !== "none" && (
-                  <div className="mb-1 flex items-center gap-2 px-3">
-                    {g.type === "Organization" ? (
-                      <Building2 className="h-3.5 w-3.5 text-ink-tertiary" />
-                    ) : (
-                      <User className="h-3.5 w-3.5 text-ink-tertiary" />
-                    )}
-                    <span className="text-[12px] font-medium text-ink-muted">{g.key}</span>
-                    <span className="text-[11px] text-ink-tertiary">{g.prs.length}</span>
-                  </div>
-                )}
-                <div className="space-y-0.5">
-                  {g.prs.map((pr) => (
-                    <PRRow
-                      key={pr.id}
-                      pr={pr}
-                      showRepo={groupBy !== "repo"}
-                      selected={selected.has(pr.id)}
-                      onClick={(e) => onRowClick(e, pr.id)}
-                    />
-                  ))}
-                </div>
-              </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-subtle">
+            <Search className="h-7 w-7 text-ink-tertiary" />
+            <p className="text-[13px]">No PRs match “{query.trim()}”.</p>
+          </div>
+        ) : groupBy === "none" ? (
+          <div className="space-y-0.5">
+            {groups[0].prs.map((pr) => (
+              <PRRow
+                key={pr.id}
+                pr={pr}
+                showRepo
+                selected={selected.has(pr.id)}
+                onClick={(e) => onRowClick(e, pr.id)}
+              />
             ))}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {groups.map((g) => {
+              const open = isOpen(g.key);
+              const groupSelected = g.prs.every((p) => selected.has(p.id));
+              return (
+                <div key={g.key || "all"}>
+                  <div className="group flex items-center gap-1 rounded-md pr-1 hover:bg-surface-1">
+                    <button
+                      onClick={() => toggleGroup(g.key)}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left"
+                    >
+                      {open ? (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
+                      )}
+                      {g.type === "Organization" ? (
+                        <Building2 className="h-4 w-4 shrink-0 text-ink-tertiary" />
+                      ) : (
+                        <User className="h-4 w-4 shrink-0 text-ink-tertiary" />
+                      )}
+                      <span className="truncate text-[13px] font-medium text-ink-muted">{g.key}</span>
+                      <span className="text-[11px] text-ink-tertiary">{g.prs.length}</span>
+                    </button>
+                    <button
+                      onClick={() => selectGroup(g)}
+                      title={groupSelected ? "Deselect all in group" : "Select all in group"}
+                      className={cn(
+                        "rounded p-1 text-ink-tertiary hover:text-ink",
+                        groupSelected ? "text-brand opacity-100" : "opacity-0 group-hover:opacity-100"
+                      )}
+                    >
+                      <CheckSquare className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {open && (
+                    <div className="ml-[9px] space-y-0.5 border-l border-hairline pl-3">
+                      {g.prs.map((pr) => (
+                        <PRRow
+                          key={pr.id}
+                          pr={pr}
+                          showRepo={groupBy !== "repo"}
+                          selected={selected.has(pr.id)}
+                          onClick={(e) => onRowClick(e, pr.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
