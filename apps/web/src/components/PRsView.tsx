@@ -19,9 +19,10 @@ import {
   CheckSquare,
   Search,
   Calendar,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { listPullRequests, type GhPull } from "@/github/client";
+import { listPullRequests, closePullRequests, type GhPull } from "@/github/client";
 import { Badge } from "./ui/primitives";
 
 type GroupBy = "repo" | "org" | "date" | "none";
@@ -75,11 +76,17 @@ function PRRow({
   showRepo,
   selected,
   onClick,
+  armed,
+  closing,
+  onClose,
 }: {
   pr: GhPull;
   showRepo: boolean;
   selected: boolean;
   onClick: (e: React.MouseEvent) => void;
+  armed: boolean;
+  closing: boolean;
+  onClose: () => void;
 }) {
   const Icon = selected ? CheckCircle2 : pr.isDraft ? GitPullRequestDraft : GitPullRequest;
   return (
@@ -122,6 +129,25 @@ function PRRow({
       >
         <ExternalLink className="h-3.5 w-3.5" />
       </a>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        title={armed ? "Click again to close this PR" : "Close PR on GitHub"}
+        className={cn(
+          "shrink-0 rounded p-0.5",
+          armed
+            ? "text-danger opacity-100"
+            : "text-ink-tertiary opacity-0 hover:text-danger group-hover:opacity-100"
+        )}
+      >
+        {closing && armed ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5" />
+        )}
+      </button>
     </div>
   );
 }
@@ -153,6 +179,9 @@ export function PRsView() {
   const [copied, setCopied] = React.useState(false);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [query, setQuery] = React.useState("");
+  const [confirmClose, setConfirmClose] = React.useState(false);
+  const [closing, setClosing] = React.useState(false);
+  const [armedRow, setArmedRow] = React.useState<string | null>(null); // per-row close confirm
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -289,6 +318,45 @@ export function PRsView() {
 
   const clearSelection = () => setSelected(new Set());
 
+  // Close PRs on GitHub, then drop them from the list (they're no longer open).
+  const closeIds = React.useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    setClosing(true);
+    setError(null);
+    try {
+      const { closed, errors } = await closePullRequests(ids);
+      const closedSet = new Set(closed);
+      setPrs((prev) => (prev ? prev.filter((p) => !closedSet.has(p.id)) : prev));
+      setSelected((prev) => {
+        const n = new Set(prev);
+        closed.forEach((id) => n.delete(id));
+        return n;
+      });
+      if (errors.length) setError(`Failed to close ${errors.length} PR(s): ${errors[0]}`);
+    } catch (e) {
+      setError(String((e as Error).message));
+    } finally {
+      setClosing(false);
+      setConfirmClose(false);
+      setArmedRow(null);
+    }
+  }, []);
+
+  const closeSelected = () => void closeIds([...selected]);
+
+  // Per-row close is a two-click confirm: first click arms (auto-disarms), second closes.
+  const onRowClose = (id: string) => {
+    if (armedRow === id) void closeIds([id]);
+    else {
+      setArmedRow(id);
+      setTimeout(() => setArmedRow((a) => (a === id ? null : a)), 3000);
+    }
+  };
+
+  React.useEffect(() => {
+    if (selected.size === 0) setConfirmClose(false);
+  }, [selected]);
+
   // ⌘/Ctrl+C copies the selection as markdown links; Escape clears it. We defer
   // to a real text selection so ordinary copy still works.
   React.useEffect(() => {
@@ -347,12 +415,34 @@ export function PRsView() {
                 {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy links"}
               </button>
+              {confirmClose ? (
+                <button
+                  onClick={closeSelected}
+                  disabled={closing}
+                  title="Confirm — close these PRs on GitHub"
+                  className="flex items-center gap-1.5 rounded-md border border-danger/50 bg-danger/10 px-2 py-1 text-[12px] text-danger hover:bg-danger/20"
+                >
+                  {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                  Confirm close {selected.size}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmClose(true)}
+                  title="Close selected PRs on GitHub"
+                  className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-danger/50 hover:text-danger"
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Close
+                </button>
+              )}
               <button
-                onClick={clearSelection}
-                title="Clear selection (Esc)"
+                onClick={() => {
+                  confirmClose ? setConfirmClose(false) : clearSelection();
+                }}
+                title={confirmClose ? "Cancel close" : "Clear selection (Esc)"}
                 className="rounded-md px-2 py-1 text-[12px] text-ink-tertiary hover:text-ink"
               >
-                Clear
+                {confirmClose ? "Cancel" : "Clear"}
               </button>
             </>
           )}
@@ -423,6 +513,9 @@ export function PRsView() {
                 showRepo
                 selected={selected.has(pr.id)}
                 onClick={(e) => onRowClick(e, pr.id)}
+                armed={armedRow === pr.id}
+                closing={closing}
+                onClose={() => onRowClose(pr.id)}
               />
             ))}
           </div>
@@ -473,6 +566,9 @@ export function PRsView() {
                           showRepo={groupBy !== "repo"}
                           selected={selected.has(pr.id)}
                           onClick={(e) => onRowClick(e, pr.id)}
+                          armed={armedRow === pr.id}
+                          closing={closing}
+                          onClose={() => onRowClose(pr.id)}
                         />
                       ))}
                     </div>

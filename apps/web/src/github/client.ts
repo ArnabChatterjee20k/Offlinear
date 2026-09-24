@@ -177,6 +177,28 @@ export async function listPullRequests(): Promise<GhPull[]> {
   }));
 }
 
+/** Close pull requests by node id (via the gh CLI bridge). Returns which ids
+ *  closed and any per-PR errors, so a partial failure doesn't lose the rest. */
+export async function closePullRequests(ids: string[]): Promise<{ closed: string[]; errors: string[] }> {
+  const closed: string[] = [];
+  const errors: string[] = [];
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        await gql(
+          `mutation($id: ID!) { closePullRequest(input: { pullRequestId: $id }) { pullRequest { id } } }`,
+          { id },
+          "cli"
+        );
+        closed.push(id);
+      } catch (e) {
+        errors.push((e as Error).message);
+      }
+    })
+  );
+  return { closed, errors };
+}
+
 export interface GhItem {
   itemId: string;
   title: string;
