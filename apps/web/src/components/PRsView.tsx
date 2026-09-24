@@ -18,12 +18,27 @@ import {
   ChevronsUpDown,
   CheckSquare,
   Search,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listPullRequests, type GhPull } from "@/github/client";
 import { Badge } from "./ui/primitives";
 
-type GroupBy = "repo" | "org" | "none";
+type GroupBy = "repo" | "org" | "date" | "none";
+
+const DATE_BUCKETS = ["Today", "Yesterday", "Previous 7 days", "Previous 30 days", "Older"] as const;
+
+/** Which relative bucket an ISO timestamp falls into (by calendar day). */
+function dateBucket(iso: string): (typeof DATE_BUCKETS)[number] {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const days = Math.floor((startOfToday.getTime() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return "Previous 7 days";
+  if (days < 30) return "Previous 30 days";
+  return "Older";
+}
 
 /** Relative "time ago" for PR updated timestamps. */
 function ago(iso: string): string {
@@ -166,6 +181,18 @@ export function PRsView() {
 
   const groups = React.useMemo(() => {
     if (groupBy === "none") return [{ key: "", type: "", prs: filtered }];
+
+    if (groupBy === "date") {
+      const map = new Map<string, GhPull[]>();
+      for (const pr of filtered) {
+        const key = dateBucket(pr.updatedAt);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(pr);
+      }
+      // Fixed chronological order (list already sorted newest-first within each).
+      return DATE_BUCKETS.filter((b) => map.has(b)).map((key) => ({ key, type: "date", prs: map.get(key)! }));
+    }
+
     const map = new Map<string, GhPull[]>();
     const typeOf = new Map<string, string>();
     for (const pr of filtered) {
@@ -416,7 +443,9 @@ export function PRsView() {
                       ) : (
                         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-tertiary" />
                       )}
-                      {g.type === "Organization" ? (
+                      {g.type === "date" ? (
+                        <Calendar className="h-4 w-4 shrink-0 text-ink-tertiary" />
+                      ) : g.type === "Organization" ? (
                         <Building2 className="h-4 w-4 shrink-0 text-ink-tertiary" />
                       ) : (
                         <User className="h-4 w-4 shrink-0 text-ink-tertiary" />
@@ -462,6 +491,7 @@ function GroupToggle({ value, onChange }: { value: GroupBy; onChange: (g: GroupB
   const opts: { key: GroupBy; label: string }[] = [
     { key: "repo", label: "Repo" },
     { key: "org", label: "Org" },
+    { key: "date", label: "Date" },
     { key: "none", label: "Flat" },
   ];
   return (
