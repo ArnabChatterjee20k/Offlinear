@@ -1,9 +1,9 @@
-import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github, DownloadCloud, Loader2 } from "lucide-react";
+import { LayoutGrid, Bot, LogOut, Keyboard, FileText, Trash2, Plus, Github, DownloadCloud, Loader2, GitPullRequest } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as React from "react";
 import { useProjects, useDrafts, useReports } from "@/hooks/useData";
 import { createReport } from "@/store/mutations";
-import { openReportPage, useRoute } from "@/store/route";
+import { openReportPage, openPRsPage, useRoute } from "@/store/route";
 import { importGists } from "@/github/gists";
 import { Avatar, Kbd } from "./ui/primitives";
 import { useAuth } from "@/store/auth";
@@ -16,13 +16,16 @@ function NavItem({
   icon: Icon,
   label,
   active,
+  onClick,
 }: {
   icon: typeof LayoutGrid;
   label: string;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors",
         active ? "bg-surface-2 text-ink" : "text-ink-subtle hover:bg-surface-1 hover:text-ink"
@@ -46,6 +49,7 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto p-2">
         <nav className="space-y-0.5">
+          <PRsNavItem />
           <NavItem icon={Bot} label="Agents" />
         </nav>
         <Projects />
@@ -59,6 +63,11 @@ export function Sidebar() {
       </div>
     </aside>
   );
+}
+
+function PRsNavItem() {
+  const active = useRoute((s) => s.prs);
+  return <NavItem icon={GitPullRequest} label="PRs" active={active} onClick={() => openPRsPage(true)} />;
 }
 
 function Projects() {

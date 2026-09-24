@@ -102,6 +102,67 @@ export async function listProjects(): Promise<GhProject[]> {
   return out;
 }
 
+export interface GhPull {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  isDraft: boolean;
+  updatedAt: string;
+  createdAt: string;
+  repo: string; // owner/name
+  owner: string; // owner login
+  ownerType: "Organization" | "User" | string;
+  reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+  comments: number;
+}
+
+/** The viewer's own open pull requests across every repo (personal + org). */
+export async function listPullRequests(): Promise<GhPull[]> {
+  const data = await gql<{
+    viewer: {
+      pullRequests: {
+        nodes: {
+          id: string;
+          number: number;
+          title: string;
+          url: string;
+          isDraft: boolean;
+          updatedAt: string;
+          createdAt: string;
+          reviewDecision: GhPull["reviewDecision"];
+          comments: { totalCount: number };
+          repository: { nameWithOwner: string; owner: { login: string; __typename: string } };
+        }[];
+      };
+    };
+  }>(`query {
+    viewer {
+      pullRequests(first: 100, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
+        nodes {
+          id number title url isDraft updatedAt createdAt reviewDecision
+          comments { totalCount }
+          repository { nameWithOwner owner { login __typename } }
+        }
+      }
+    }
+  }`);
+  return data.viewer.pullRequests.nodes.map((n) => ({
+    id: n.id,
+    number: n.number,
+    title: n.title,
+    url: n.url,
+    isDraft: n.isDraft,
+    updatedAt: n.updatedAt,
+    createdAt: n.createdAt,
+    repo: n.repository.nameWithOwner,
+    owner: n.repository.owner.login,
+    ownerType: n.repository.owner.__typename,
+    reviewDecision: n.reviewDecision,
+    comments: n.comments.totalCount,
+  }));
+}
+
 export interface GhItem {
   itemId: string;
   title: string;

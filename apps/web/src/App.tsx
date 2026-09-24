@@ -3,6 +3,7 @@ import { TopBar } from "./components/TopBar";
 import { Board } from "./components/Board";
 import { IssueView } from "./components/IssueView";
 import { ReportView } from "./components/ReportView";
+import { PRsView } from "./components/PRsView";
 import { CommandPalette } from "./components/CommandPalette";
 import { ShortcutsHelp } from "./components/ShortcutsHelp";
 import { CreateIssueModal } from "./components/CreateIssueModal";
@@ -14,7 +15,7 @@ import { useRoute } from "./store/route";
 
 export function App() {
   useKeyboard();
-  const { issueId, reportId } = useRoute();
+  const { issueId, reportId, prs } = useRoute();
   return (
     <div className="flex h-full w-full overflow-hidden bg-canvas">
       <Sidebar />
@@ -23,6 +24,8 @@ export function App() {
           <IssueView issueId={issueId} />
         ) : reportId ? (
           <ReportView reportId={reportId} />
+        ) : prs ? (
+          <PRsView />
         ) : (
           <>
             <TopBar />
