@@ -68,13 +68,10 @@ function PRRow({
 }) {
   const Icon = selected ? CheckCircle2 : pr.isDraft ? GitPullRequestDraft : GitPullRequest;
   return (
-    <a
-      href={pr.url}
-      target="_blank"
-      rel="noreferrer noopener"
+    <div
       onClick={onClick}
       className={cn(
-        "group flex items-center gap-3 rounded-md px-3 py-2",
+        "group flex cursor-pointer select-none items-center gap-3 rounded-md px-3 py-2",
         selected ? "bg-surface-2 ring-1 ring-inset ring-brand/40" : "hover:bg-surface-1"
       )}
     >
@@ -100,8 +97,17 @@ function PRRow({
           )}
         </div>
       </div>
-      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-ink-tertiary opacity-0 group-hover:opacity-100" />
-    </a>
+      <a
+        href={pr.url}
+        target="_blank"
+        rel="noreferrer noopener"
+        onClick={(e) => e.stopPropagation()}
+        title="Open on GitHub"
+        className="shrink-0 rounded p-0.5 text-ink-tertiary opacity-0 hover:text-ink group-hover:opacity-100"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+    </div>
   );
 }
 
@@ -181,6 +187,14 @@ export function PRsView() {
   React.useEffect(() => setExpanded(new Set()), [groupBy]);
 
   const isOpen = (key: string) => groupBy === "none" || searching || expanded.has(key);
+
+  // Only currently-visible rows participate in Shift range-select, so a range
+  // never sweeps up PRs hidden inside collapsed groups.
+  const visibleIds = React.useMemo(
+    () => groups.flatMap((g) => (isOpen(g.key) ? g.prs.map((p) => p.id) : [])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, expanded, searching, groupBy]
+  );
   const toggleGroup = (key: string) =>
     setExpanded((prev) => {
       const n = new Set(prev);
@@ -207,16 +221,17 @@ export function PRsView() {
     return next;
   };
 
-  // Click: plain = open on GitHub; ⌘/Ctrl = toggle one; Shift = range from the
-  // anchor; a plain click while a selection exists toggles instead of opening.
+  // Click: plain = open on GitHub; ⌘/Ctrl = toggle one; Shift = select the range
+  // (over visible rows) from the anchor; a plain click while a selection exists
+  // toggles instead of opening.
   const onRowClick = (e: React.MouseEvent, id: string) => {
     if (e.shiftKey) {
       e.preventDefault();
-      const a = orderedIds.indexOf(anchor ?? id);
-      const b = orderedIds.indexOf(id);
+      const a = visibleIds.indexOf(anchor ?? id);
+      const b = visibleIds.indexOf(id);
       if (a >= 0 && b >= 0) {
         const [lo, hi] = a < b ? [a, b] : [b, a];
-        setSelected((prev) => new Set([...prev, ...orderedIds.slice(lo, hi + 1)]));
+        setSelected((prev) => new Set([...prev, ...visibleIds.slice(lo, hi + 1)]));
       } else setSelected((prev) => toggle(prev, id));
       setAnchor(id);
     } else if (e.metaKey || e.ctrlKey) {
@@ -228,7 +243,8 @@ export function PRsView() {
       setSelected((prev) => toggle(prev, id));
       setAnchor(id);
     } else {
-      setAnchor(id); // plain click falls through to the <a> (opens in new tab)
+      setAnchor(id);
+      window.open(byId.get(id)?.url, "_blank", "noopener,noreferrer");
     }
   };
 
