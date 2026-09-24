@@ -10,6 +10,8 @@ import {
   User,
   Check,
   X,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listPullRequests, type GhPull } from "@/github/client";
@@ -47,16 +49,35 @@ function reviewBadge(decision: GhPull["reviewDecision"]) {
   return null;
 }
 
-function PRRow({ pr, showRepo }: { pr: GhPull; showRepo: boolean }) {
-  const Icon = pr.isDraft ? GitPullRequestDraft : GitPullRequest;
+function PRRow({
+  pr,
+  showRepo,
+  selected,
+  onClick,
+}: {
+  pr: GhPull;
+  showRepo: boolean;
+  selected: boolean;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  const Icon = selected ? CheckCircle2 : pr.isDraft ? GitPullRequestDraft : GitPullRequest;
   return (
     <a
       href={pr.url}
       target="_blank"
       rel="noreferrer noopener"
-      className="group flex items-center gap-3 rounded-md px-3 py-2 hover:bg-surface-1"
+      onClick={onClick}
+      className={cn(
+        "group flex items-center gap-3 rounded-md px-3 py-2",
+        selected ? "bg-surface-2 ring-1 ring-inset ring-brand/40" : "hover:bg-surface-1"
+      )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", pr.isDraft ? "text-ink-tertiary" : "text-success")} />
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0",
+          selected ? "text-brand" : pr.isDraft ? "text-ink-tertiary" : "text-success"
+        )}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] text-ink group-hover:text-white">{pr.title}</span>
@@ -78,11 +99,19 @@ function PRRow({ pr, showRepo }: { pr: GhPull; showRepo: boolean }) {
   );
 }
 
+/** Markdown links for the given PRs: [owner/repo #num](url), one per line. */
+function toMarkdown(prs: GhPull[]): string {
+  return prs.map((p) => `[${p.repo} #${p.number}](${p.url})`).join("\n");
+}
+
 export function PRsView() {
   const [prs, setPrs] = React.useState<GhPull[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [groupBy, setGroupBy] = React.useState<GroupBy>("repo");
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [anchor, setAnchor] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -116,14 +145,109 @@ export function PRsView() {
       .map(([key, prs]) => ({ key, type: typeOf.get(key) ?? "", prs }));
   }, [prs, groupBy]);
 
+  // Visual order of PR ids (across groups) — drives Shift range-select.
+  const orderedIds = React.useMemo(() => groups.flatMap((g) => g.prs.map((p) => p.id)), [groups]);
+  const byId = React.useMemo(() => new Map((prs ?? []).map((p) => [p.id, p])), [prs]);
+
+  const toggle = (set: Set<string>, id: string) => {
+    const next = new Set(set);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  };
+
+  // Click: plain = open on GitHub; ⌘/Ctrl = toggle one; Shift = range from the
+  // anchor; a plain click while a selection exists toggles instead of opening.
+  const onRowClick = (e: React.MouseEvent, id: string) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      const a = orderedIds.indexOf(anchor ?? id);
+      const b = orderedIds.indexOf(id);
+      if (a >= 0 && b >= 0) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelected((prev) => new Set([...prev, ...orderedIds.slice(lo, hi + 1)]));
+      } else setSelected((prev) => toggle(prev, id));
+      setAnchor(id);
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      setSelected((prev) => toggle(prev, id));
+      setAnchor(id);
+    } else if (selected.size > 0) {
+      e.preventDefault();
+      setSelected((prev) => toggle(prev, id));
+      setAnchor(id);
+    } else {
+      setAnchor(id); // plain click falls through to the <a> (opens in new tab)
+    }
+  };
+
+  const copySelected = React.useCallback(async () => {
+    const chosen = orderedIds.filter((id) => selected.has(id)).map((id) => byId.get(id)!).filter(Boolean);
+    if (chosen.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(toMarkdown(chosen));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      console.error("[prs] copy failed", e);
+    }
+  }, [orderedIds, selected, byId]);
+
+  const clearSelection = () => setSelected(new Set());
+
+  // ⌘/Ctrl+C copies the selection as markdown links; Escape clears it. We defer
+  // to a real text selection so ordinary copy still works.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selected.size > 0) {
+        clearSelection();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "c" || e.key === "C")) {
+        if (selected.size === 0) return;
+        if (window.getSelection?.()?.toString()) return; // let normal text copy happen
+        e.preventDefault();
+        void copySelected();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selected, copySelected]);
+
+  // Selecting rows disables the browser's text selection so Shift+click ranges
+  // don't also highlight text.
+  const userSelect = selected.size > 0 ? "select-none" : "";
+
   return (
     <div className="flex h-full flex-col bg-canvas">
       <div className="flex items-center gap-2 border-b border-hairline px-5 py-2.5">
         <GitPullRequest className="h-4 w-4 text-ink-tertiary" />
         <span className="text-[13px] font-medium text-ink">PRs</span>
-        {prs && <span className="text-[12px] text-ink-tertiary">{prs.length} open</span>}
+        {selected.size > 0 ? (
+          <span className="text-[12px] text-brand">{selected.size} selected</span>
+        ) : (
+          prs && <span className="text-[12px] text-ink-tertiary">{prs.length} open</span>
+        )}
         {error && <span className="ml-2 truncate text-[12px] text-danger">{error}</span>}
         <div className="ml-auto flex items-center gap-2">
+          {selected.size > 0 && (
+            <>
+              <button
+                onClick={() => void copySelected()}
+                title="Copy selected as markdown links (⌘/Ctrl+C)"
+                className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-hairline-strong hover:text-ink"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy links"}
+              </button>
+              <button
+                onClick={clearSelection}
+                title="Clear selection (Esc)"
+                className="rounded-md px-2 py-1 text-[12px] text-ink-tertiary hover:text-ink"
+              >
+                Clear
+              </button>
+            </>
+          )}
           <GroupToggle value={groupBy} onChange={setGroupBy} />
           <button
             onClick={() => void load()}
@@ -136,7 +260,7 @@ export function PRsView() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[900px] flex-1 overflow-y-auto px-6 py-5">
+      <div className={cn("mx-auto w-full max-w-[900px] flex-1 overflow-y-auto px-6 py-5", userSelect)}>
         {loading && !prs ? (
           <div className="flex h-full items-center justify-center gap-2 text-[13px] text-ink-subtle">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading your open pull requests…
@@ -171,7 +295,13 @@ export function PRsView() {
                 )}
                 <div className="space-y-0.5">
                   {g.prs.map((pr) => (
-                    <PRRow key={pr.id} pr={pr} showRepo={groupBy !== "repo"} />
+                    <PRRow
+                      key={pr.id}
+                      pr={pr}
+                      showRepo={groupBy !== "repo"}
+                      selected={selected.has(pr.id)}
+                      onClick={(e) => onRowClick(e, pr.id)}
+                    />
                   ))}
                 </div>
               </div>
