@@ -4,9 +4,13 @@
 import { githubToken } from "@/auth";
 import { BRIDGE_URL, getMode } from "./config";
 
-async function gql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+async function gql<T>(
+  query: string,
+  variables: Record<string, unknown> = {},
+  force?: "cli" | "oauth"
+): Promise<T> {
   const body = JSON.stringify({ query, variables });
-  const mode = await getMode();
+  const mode = force ?? (await getMode());
 
   let res: Response;
   if (mode === "cli") {
@@ -26,8 +30,14 @@ async function gql<T>(query: string, variables: Record<string, unknown> = {}): P
     });
   }
 
-  const json = await res.json();
+  const json = await res.json().catch(() => null);
+  if (!json) {
+    if (mode === "cli") throw new Error(`gh bridge error (${res.status}) at ${BRIDGE_URL}. Is the server running and gh signed in?`);
+    throw new Error(`GitHub ${res.status}`);
+  }
   if (json.errors) throw new Error(json.errors.map((e: { message: string }) => e.message).join("; "));
+  if (json.error) throw new Error(String(json.error)); // bridge surfaced (e.g. gh not authenticated)
+  if (!json.data) throw new Error(mode === "cli" ? `gh bridge returned no data (is gh authenticated?)` : "GitHub returned no data");
   return json.data as T;
 }
 
@@ -117,7 +127,8 @@ export interface GhPull {
   comments: number;
 }
 
-/** The viewer's own open pull requests across every repo (personal + org). */
+/** The viewer's own open pull requests across every repo (personal + org).
+ *  Always fetched through the local gh CLI bridge (not the OAuth token). */
 export async function listPullRequests(): Promise<GhPull[]> {
   const data = await gql<{
     viewer: {
@@ -146,7 +157,10 @@ export async function listPullRequests(): Promise<GhPull[]> {
         }
       }
     }
-  }`);
+  }`,
+    {},
+    "cli"
+  );
   return data.viewer.pullRequests.nodes.map((n) => ({
     id: n.id,
     number: n.number,
