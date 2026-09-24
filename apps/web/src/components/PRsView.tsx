@@ -20,6 +20,8 @@ import {
   Search,
   Calendar,
   XCircle,
+  GitMerge,
+  GitPullRequestClosed,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listPullRequests, closePullRequests, type GhPull } from "@/github/client";
@@ -88,7 +90,24 @@ function PRRow({
   closing: boolean;
   onClose: () => void;
 }) {
-  const Icon = selected ? CheckCircle2 : pr.isDraft ? GitPullRequestDraft : GitPullRequest;
+  const Icon = selected
+    ? CheckCircle2
+    : pr.state === "MERGED"
+    ? GitMerge
+    : pr.state === "CLOSED"
+    ? GitPullRequestClosed
+    : pr.isDraft
+    ? GitPullRequestDraft
+    : GitPullRequest;
+  const iconColor = selected
+    ? "text-brand"
+    : pr.state === "MERGED"
+    ? "text-[#a371f7]"
+    : pr.state === "CLOSED"
+    ? "text-danger"
+    : pr.isDraft
+    ? "text-ink-tertiary"
+    : "text-success";
   return (
     <div
       onClick={onClick}
@@ -98,10 +117,7 @@ function PRRow({
       )}
     >
       <Icon
-        className={cn(
-          "h-4 w-4 shrink-0",
-          selected ? "text-brand" : pr.isDraft ? "text-ink-tertiary" : "text-success"
-        )}
+        className={cn("h-4 w-4 shrink-0", iconColor)}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -129,25 +145,27 @@ function PRRow({
       >
         <ExternalLink className="h-3.5 w-3.5" />
       </a>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        title={armed ? "Click again to close this PR" : "Close PR on GitHub"}
-        className={cn(
-          "shrink-0 rounded p-0.5",
-          armed
-            ? "text-danger opacity-100"
-            : "text-ink-tertiary opacity-0 hover:text-danger group-hover:opacity-100"
-        )}
-      >
-        {closing && armed ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <XCircle className="h-3.5 w-3.5" />
-        )}
-      </button>
+      {pr.state === "OPEN" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          title={armed ? "Click again to close this PR" : "Close PR on GitHub"}
+          className={cn(
+            "shrink-0 rounded p-0.5",
+            armed
+              ? "text-danger opacity-100"
+              : "text-ink-tertiary opacity-0 hover:text-danger group-hover:opacity-100"
+          )}
+        >
+          {closing && armed ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <XCircle className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -173,6 +191,7 @@ export function PRsView() {
   const [prs, setPrs] = React.useState<GhPull[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [status, setStatus] = React.useState<"open" | "closed">("open");
   const [groupBy, setGroupBy] = React.useState<GroupBy>("repo");
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [anchor, setAnchor] = React.useState<string | null>(null);
@@ -187,15 +206,17 @@ export function PRsView() {
     setLoading(true);
     setError(null);
     try {
-      setPrs(await listPullRequests());
+      setPrs(await listPullRequests(status));
     } catch (e) {
       setError(String((e as Error).message));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [status]);
 
   React.useEffect(() => {
+    setPrs(null); // clear stale list while switching Open/Closed
+    setSelected(new Set());
     void load();
   }, [load]);
 
@@ -390,12 +411,15 @@ export function PRsView() {
         ) : (
           prs && (
             <span className="text-[12px] text-ink-tertiary">
-              {searching ? `${filtered.length} of ${prs.length}` : `${prs.length} open`}
+              {searching
+                ? `${filtered.length} of ${prs.length}`
+                : `${prs.length} ${status === "open" ? "open" : "closed"}`}
             </span>
           )
         )}
         {error && <span className="ml-2 truncate text-[12px] text-danger">{error}</span>}
         <div className="ml-auto flex items-center gap-2">
+          <StatusToggle value={status} onChange={setStatus} />
           {groupBy !== "none" && groups.length > 0 && !searching && (
             <button
               onClick={toggleAll}
@@ -415,26 +439,27 @@ export function PRsView() {
                 {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy links"}
               </button>
-              {confirmClose ? (
-                <button
-                  onClick={closeSelected}
-                  disabled={closing}
-                  title="Confirm — close these PRs on GitHub"
-                  className="flex items-center gap-1.5 rounded-md border border-danger/50 bg-danger/10 px-2 py-1 text-[12px] text-danger hover:bg-danger/20"
-                >
-                  {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
-                  Confirm close {selected.size}
-                </button>
-              ) : (
-                <button
-                  onClick={() => setConfirmClose(true)}
-                  title="Close selected PRs on GitHub"
-                  className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-danger/50 hover:text-danger"
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                  Close
-                </button>
-              )}
+              {status === "open" &&
+                (confirmClose ? (
+                  <button
+                    onClick={closeSelected}
+                    disabled={closing}
+                    title="Confirm — close these PRs on GitHub"
+                    className="flex items-center gap-1.5 rounded-md border border-danger/50 bg-danger/10 px-2 py-1 text-[12px] text-danger hover:bg-danger/20"
+                  >
+                    {closing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                    Confirm close {selected.size}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setConfirmClose(true)}
+                    title="Close selected PRs on GitHub"
+                    className="flex items-center gap-1.5 rounded-md border border-hairline px-2 py-1 text-[12px] text-ink-subtle hover:border-danger/50 hover:text-danger"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Close
+                  </button>
+                ))}
               <button
                 onClick={() => {
                   confirmClose ? setConfirmClose(false) : clearSelection();
@@ -496,7 +521,7 @@ export function PRsView() {
         ) : prs && prs.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-subtle">
             <GitPullRequest className="h-8 w-8 text-ink-tertiary" />
-            <p className="text-[14px]">No open pull requests.</p>
+            <p className="text-[14px]">No {status === "open" ? "open" : "recently closed"} pull requests.</p>
             <p className="text-[12px] text-ink-tertiary">PRs you author across your repos and orgs show up here.</p>
           </div>
         ) : filtered.length === 0 ? (
@@ -579,6 +604,35 @@ export function PRsView() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatusToggle({
+  value,
+  onChange,
+}: {
+  value: "open" | "closed";
+  onChange: (s: "open" | "closed") => void;
+}) {
+  const opts: { key: "open" | "closed"; label: string }[] = [
+    { key: "open", label: "Open" },
+    { key: "closed", label: "Closed" },
+  ];
+  return (
+    <div className="flex items-center rounded-md border border-hairline p-0.5">
+      {opts.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={cn(
+            "rounded px-2 py-0.5 text-[12px] transition-colors",
+            value === o.key ? "bg-surface-2 text-ink" : "text-ink-subtle hover:text-ink"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

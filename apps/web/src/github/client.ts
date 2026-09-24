@@ -118,6 +118,7 @@ export interface GhPull {
   title: string;
   url: string;
   isDraft: boolean;
+  state: "OPEN" | "CLOSED" | "MERGED";
   updatedAt: string;
   createdAt: string;
   repo: string; // owner/name
@@ -127,9 +128,12 @@ export interface GhPull {
   comments: number;
 }
 
-/** The viewer's own open pull requests across every repo (personal + org).
- *  Always fetched through the local gh CLI bridge (not the OAuth token). */
-export async function listPullRequests(): Promise<GhPull[]> {
+/** The viewer's own pull requests across every repo (personal + org), newest
+ *  first. status "open" → OPEN; "closed" → recently CLOSED + MERGED. Always
+ *  fetched through the local gh CLI bridge (not the OAuth token). */
+export async function listPullRequests(status: "open" | "closed" = "open"): Promise<GhPull[]> {
+  const states = status === "open" ? "OPEN" : "[CLOSED, MERGED]";
+  const first = status === "open" ? 100 : 50;
   const data = await gql<{
     viewer: {
       pullRequests: {
@@ -139,6 +143,7 @@ export async function listPullRequests(): Promise<GhPull[]> {
           title: string;
           url: string;
           isDraft: boolean;
+          state: GhPull["state"];
           updatedAt: string;
           createdAt: string;
           reviewDecision: GhPull["reviewDecision"];
@@ -149,9 +154,9 @@ export async function listPullRequests(): Promise<GhPull[]> {
     };
   }>(`query {
     viewer {
-      pullRequests(first: 100, states: OPEN, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      pullRequests(first: ${first}, states: ${states}, orderBy: { field: UPDATED_AT, direction: DESC }) {
         nodes {
-          id number title url isDraft updatedAt createdAt reviewDecision
+          id number title url isDraft state updatedAt createdAt reviewDecision
           comments { totalCount }
           repository { nameWithOwner owner { login __typename } }
         }
@@ -167,6 +172,7 @@ export async function listPullRequests(): Promise<GhPull[]> {
     title: n.title,
     url: n.url,
     isDraft: n.isDraft,
+    state: n.state,
     updatedAt: n.updatedAt,
     createdAt: n.createdAt,
     repo: n.repository.nameWithOwner,
